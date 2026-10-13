@@ -1,6 +1,6 @@
 # AI State — Launcher Hub (swiss-army)
 
-Last updated: 2026-10-13 · Session focus: Settings tab (configurable data folder) + README refresh. **Version 1.0.1.1.**
+Last updated: 2026-10-13 · Session focus: bug sweep + startup data-folder prompt (no silent folder creation) + default moved to `data/`. **Version 1.0.1.5.**
 
 ## 1. Project Overview
 
@@ -20,13 +20,13 @@ All tabs persist their data to JSON files in the data folder and survive restart
 
 | File | Purpose |
 |---|---|
-| `app.py` (~1200 lines) | The entire application: persistence, settings, icon engine, all three tabs, dialogs |
+| `app.py` (~1300 lines) | The entire application: persistence, settings, icon engine, all three tabs, dialogs |
 | `swiss-army.bat` | Launcher: uses `venv\Scripts\python.exe` if present, else system `python`; `pause` only on `errorlevel 1` so a clean close doesn't leave a cmd window |
-| `settings.json` | App settings (`{"data_folder": ...}`); created when the user first browses; absent = default data folder is the app directory |
+| `settings.json` | App settings (`{"data_folder": ...}`); created when the user first browses; absent = default data folder is the `data` subdirectory next to the app |
 | `apps.json` | App Launcher data (lives in the **data folder**) |
 | `folders.json` | Folder Launcher data (lives in the **data folder**) |
-| `README.md` | User-facing docs, current as of v1.0.1.1 |
-| `swiss-army.ico` | App icon (exists but not yet applied as the window icon) |
+| `README.md` | User-facing docs, current as of v1.0.1.5 |
+| `swiss-army.ico` | App icon, applied as the window icon in `main()` |
 | `.gitignore` | Generic multi-language ignore file; `venv/`, `__pycache__/` ignored |
 | `venv/` | Virtual environment (no packages installed in it) |
 
@@ -92,7 +92,7 @@ Adopted patterns that aren't obvious from the config files:
 - **In-place mutation helpers** return a success flag; the caller persists and refreshes (e.g. `delete_category_with_migration`).
 - **Tk gotchas encoded in comments:** Treeview items insert **closed** by default on Tk 8.6.15 (must pass `open=True`); `tree.parent()` returns `''` not `None` for top-level items; `tree.selection()` returns **string item IDs**, not list indices (use `tree.index(id)`); `PhotoImage` is RGB-only (flatten alpha onto a background).
 - **Keep PhotoImages referenced** (`self._images`) or Tk silently drops them.
-- `APP_NAME = "Folder Launcher"` is used as the title for **all** messageboxes/dialogs — it predates the app being renamed to "Launcher Hub".
+- `APP_NAME = "Launcher Hub"` is used as the title for **all** messageboxes/dialogs (was "Folder Launcher" pre-v1.0.1.2). `VERSION` constant lives next to it.
 - The `.bat` launcher only `pause`s on failure (`if errorlevel 1 pause`) so a clean exit doesn't strand a console window.
 
 ## 6. Current Status & Roadmap
@@ -104,14 +104,25 @@ Adopted patterns that aren't obvious from the config files:
 - `swiss-army.bat`: venv-aware launcher, no lingering console window on clean exit.
 - README.md current as of v1.0.1.1.
 
-### 🚧 Half-baked / Known Gaps
-- **No tests** of any kind; nothing guards against regressions in the icon decoders or persistence loaders.
-- Window icon not set: `swiss-army.ico` exists but `main()` never calls `root.iconbitmap(...)`.
-- No version constant in code — the version lives only in README.md.
+### ✅ Fixed in v1.0.1.2 (superseded by the v1.0.1.3/4 startup prompt)
+- **Startup crash**: a stale `settings.json` pointing at a deleted folder no longer crashes the app — handled by the startup data-folder prompt (below). `settings.json` was repointed from the non-existent `datax` to the real data folder `data\`.
+- **DIB icon decoding**: `_dib_to_photoimage()` ignored the 1-bit mask bytes when computing row strides, so classic (non-PNG) `.ico` entries rendered as garbage. Rows are now read with `w*4 + mask_row` stride.
+- **Drag-to-reorder**: cells now physically swap grid slots during a drag (icons visibly follow the new order; `DRAG_BG` highlight stays on the dragged cell). Previously the grid never reflowed live and the highlight landed on the wrong cell.
+- **`_wrap_name()`**: single long words (and any over-wide line) are now truncated with an ellipsis; previously only multi-word overflow was handled.
+- **Atomic saves**: all three savers write via temp file + `os.replace`, so a crash mid-write can't corrupt the JSON.
+- **`grab_set()`** wrapped in `_safe_grab()` (tolerates unmapped Toplevels).
+- **Interlaced PNGs** (Adam7) are now rejected cleanly → folder-icon fallback, instead of decoding garbage.
+- `APP_NAME` renamed to "Launcher Hub"; `VERSION = "1.0.1.2"` added; `root.iconbitmap("swiss-army.ico")` set in `main()` (guarded).
+- `test_app.py` created (31 headless checks, all passing); later removed from the repo.
+
+### ✅ Added in v1.0.1.3 / refined in v1.0.1.4–5
+- **Startup data-folder prompt**: `main()` checks the configured data folder before building the UI. If it no longer exists, the user gets an info box + `askdirectory` to pick an **existing** one (persisted to `settings.json`). Cancelling reverts to the default — the `data` subdirectory next to the app (also persisted). The root window is withdrawn while this resolves and deiconified only after `MainApp` is built, so no empty window flashes.
+- **Default data folder is now `data/`**: `default_data_folder()` returns `<script dir>\data`; `load_settings()` falls back to it when `settings.json` is absent/corrupt. First run (configured folder *is* the default and missing) bootstraps it without prompting.
+- **No silent folder creation**: `set_data_folder()` no longer calls `os.makedirs`. Callers guarantee the folder exists (startup prompt, Settings-tab picker, or the `data/` bootstrap). Pointing it at a missing folder now raises `OSError` on save instead of creating the folder.
+
+### 🚧 Known Gaps
 - Cosmetic: antialiased icon edges can show a faint mismatch against the selection highlight (inherent to RGB-only PhotoImage; flattening happens at load time, before selection).
 - Folder entries aren't validated at load time — a missing folder is only reported when you try to open it.
 
 ### 🎯 Next Actions
-1. **Create `D:\_Apps\swiss-army\test_app.py`** — headless smoke tests (`tk.Tk()` + `root.withdraw()`) covering `load_store`, `load_apps`, `load_settings`, `set_data_folder`, `_decode_png`, `_wrap_name`, and `_parse_ico` entry selection.
-2. **Open `D:\_Apps\swiss-army\app.py`** — add `VERSION = "1.0.1.1"` near `APP_NAME`, call `root.iconbitmap(...)` in `main()`, and consider renaming `APP_NAME` to `"Launcher Hub"` (affects every dialog title).
-3. Optionally validate folder entries at load time in `load_store()` (flag or drop missing paths) — file: `D:\_Apps\swiss-army\app.py`.
+1. Optionally validate folder entries at load time in `load_store()` (flag or drop missing paths) — file: `D:\_Apps\swiss-army\app.py`.

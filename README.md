@@ -1,4 +1,4 @@
-# Version 1.0.1.1
+# Version 1.0.1.5
 
 # Launcher Hub
 
@@ -54,7 +54,8 @@ Or open the PNG in GIMP and use *File → Export As* with the `.ico` format.
 Choose where your data is stored.
 
 - **Data folder** — `apps.json` and `folders.json` live here. Pick a folder with **Browse…**; the choice is remembered in `settings.json`. If either data file doesn't exist in the folder, it's created automatically (existing files are never overwritten).
-- The default data folder is the directory containing the app itself.
+- The default data folder is the `data` subdirectory next to the app.
+- If the configured data folder no longer exists at startup, you're prompted to pick an existing one; cancelling reverts to the default (`data` subdirectory next to the app). A stale folder is never recreated silently.
 
 ## Requirements
 
@@ -69,3 +70,5 @@ venv\Scripts\python.exe app.py
 ```
 
 Or just double-click **swiss-army.bat** (uses the venv automatically; only keeps the console window open if the app fails to start).
+
+

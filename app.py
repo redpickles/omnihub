@@ -21,7 +21,8 @@ import tkinter as tk
 import zlib
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-APP_NAME = "Folder Launcher"
+APP_NAME = "Launcher Hub"
+VERSION = "1.0.1.5"
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "folders.json")
 
 
@@ -55,10 +56,21 @@ def load_store():
     return {"categories": cleaned}
 
 
+def _atomic_write(path, text):
+    """Write `text` to `path` atomically (temp file + rename).
+
+    A crash mid-write can never leave a half-written (corrupt) JSON file
+    behind, because the target is only replaced once fully written.
+    """
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.replace(tmp, path)
+
+
 def save_store(store):
     """Persist the category store to the config file."""
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(store, f, ensure_ascii=False, indent=2)
+    _atomic_write(CONFIG_FILE, json.dumps(store, ensure_ascii=False, indent=2))
 
 
 def sorted_categories(store):
@@ -84,20 +96,24 @@ def load_apps():
 
 def save_apps(apps):
     """Persist the app shortcuts to apps.json."""
-    with open(APPS_FILE, "w", encoding="utf-8") as f:
-        json.dump({"apps": apps}, f, ensure_ascii=False, indent=2)
+    _atomic_write(APPS_FILE, json.dumps({"apps": apps}, ensure_ascii=False, indent=2))
 
 
 SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
 
 
+def default_data_folder():
+    """The default data folder: the `data` subdirectory next to this script."""
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+
+
 def load_settings():
     """Load app settings. Returns {"data_folder": <str>}.
 
-    The data folder defaults to the directory containing this script, which
-    keeps first-run behaviour identical to the original layout.
+    The data folder defaults to the `data` subdirectory next to this script,
+    which is where the data files live out of the box.
     """
-    default = os.path.dirname(os.path.abspath(__file__))
+    default = default_data_folder()
     if not os.path.exists(SETTINGS_FILE):
         return {"data_folder": default}
     try:
@@ -113,13 +129,17 @@ def load_settings():
 
 def save_settings(settings):
     """Persist app settings to settings.json."""
-    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-        json.dump(settings, f, ensure_ascii=False, indent=2)
+    _atomic_write(SETTINGS_FILE, json.dumps(settings, ensure_ascii=False, indent=2))
 
 
 def set_data_folder(folder):
     """Point CONFIG_FILE/APPS_FILE at `folder`, creating the data files if
-    they don't exist there yet."""
+    they don't exist there yet.
+
+    `folder` must already exist; callers guarantee this (the startup prompt
+    and the Settings tab both use a directory picker, and the default is the
+    app's own directory). A missing folder is never created silently.
+    """
     global CONFIG_FILE, APPS_FILE
     CONFIG_FILE = os.path.join(folder, "folders.json")
     APPS_FILE = os.path.join(folder, "apps.json")
@@ -164,26 +184,31 @@ def _dib_to_photoimage(blob, size, background=(255, 255, 255)):
     mask_row = (w + 7) // 8
     if mask_row % 2:
         mask_row += 1
-    denom = w * 4 + mask_row
-    if len(data) % denom == 0:          # standard icon DIB (color rows + zero mask)
-        h = len(data) // denom
-    elif len(data) % (w * 4) == 0:      # no mask stored
-        h = len(data) // (w * 4)
+    stride = w * 4                      # row width in bytes
+    if len(data) % (stride + mask_row) == 0:  # standard icon DIB (color rows + zero mask)
+        h, stride = len(data) // (stride + mask_row), stride + mask_row
+    elif len(data) % stride == 0:       # no mask stored
+        h = len(data) // stride
     else:
         return None
     img = tk.PhotoImage(width=size, height=size)
+    hex_cache = {}  # (r, g, b) -> "#rrggbb"; icons reuse few colors
     for y in range(size):
         src_y = h - 1 - int(y * h / size)  # DIB rows are bottom-up
         for x in range(size):
             src_x = int(x * w / size)
-            o = src_y * w * 4 + src_x * 4
+            o = src_y * stride + src_x * 4
             b, g, r, a = data[o], data[o + 1], data[o + 2], data[o + 3]
             if a < 255:  # flatten transparency onto the background color
                 br, bg_c, bb = background
                 r = (r * a + br * (255 - a)) // 255
                 g = (g * a + bg_c * (255 - a)) // 255
                 b = (b * a + bb * (255 - a)) // 255
-            img.put(f"#{r:02x}{g:02x}{b:02x}", (x, y))
+            color = hex_cache.get((r, g, b))
+            if color is None:
+                color = f"#{r:02x}{g:02x}{b:02x}"
+                hex_cache[(r, g, b)] = color
+            img.put(color, (x, y))
     return img
 
 
@@ -216,13 +241,17 @@ def _decode_png(data):
     while pos + 8 <= len(data):
         length, ctype = struct.unpack_from(">I4s", data, pos)
         if ctype == b"IHDR":
-            width, height, bitdepth, colortype = struct.unpack_from(">IIBB", data, pos + 8)
+            (width, height, bitdepth, colortype, _compression, _filter, interlace) = (
+                struct.unpack_from(">IIBBBBB", data, pos + 8)
+            )
         elif ctype == b"IDAT":
             idat += data[pos + 8:pos + 8 + length]
         elif ctype == b"IEND":
             break
         pos += 12 + length
     if width is None or height is None:
+        return None
+    if interlace != 0:  # Adam7 interlaced scanlines are not supported
         return None
     if bitdepth not in (8, 16) or colortype not in (0, 2, 4, 6):
         return None
@@ -292,6 +321,7 @@ def _png_to_photoimage(blob, size, background=(255, 255, 255)):
     w, h, pixels = decoded
     br, bg_c, bb = background
     img = tk.PhotoImage(width=size, height=size)
+    hex_cache = {}  # (r, g, b) -> "#rrggbb"; icons reuse few colors
     for y in range(size):
         src_y = int(y * h / size)  # nearest-neighbor scaling
         for x in range(size):
@@ -301,7 +331,11 @@ def _png_to_photoimage(blob, size, background=(255, 255, 255)):
                 r = (r * a + br * (255 - a)) // 255
                 g = (g * a + bg_c * (255 - a)) // 255
                 b = (b * a + bb * (255 - a)) // 255
-            img.put(f"#{r:02x}{g:02x}{b:02x}", (x, y))
+            color = hex_cache.get((r, g, b))
+            if color is None:
+                color = f"#{r:02x}{g:02x}{b:02x}"
+                hex_cache[(r, g, b)] = color
+            img.put(color, (x, y))
     return img
 
 
@@ -354,6 +388,18 @@ def folder_icon(size=32):
     return img
 
 
+def _safe_grab(widget):
+    """grab_set() that tolerates an unmapped window.
+
+    Tk raises TclError if the grab is requested before the Toplevel has been
+    mapped; ignoring that keeps the dialog usable instead of crashing.
+    """
+    try:
+        widget.grab_set()
+    except tk.TclError:
+        pass
+
+
 class _DestinationDialog(tk.Toplevel):
     """Ask where the entries of a deleted category should go."""
 
@@ -386,7 +432,7 @@ class _DestinationDialog(tk.Toplevel):
         ttk.Button(buttons, text="Cancel", command=self.destroy).pack(side="right")
 
         self.listbox.selection_set(0)
-        self.grab_set()
+        _safe_grab(self)
         self.focus_set()
 
     def _ok(self):
@@ -479,7 +525,7 @@ class _CategoryPickerDialog(tk.Toplevel):
         ttk.Button(buttons, text="Cancel", command=self.destroy).pack(side="right")
 
         self._on_combo_select()  # sync entry state with the initial selection
-        self.grab_set()
+        _safe_grab(self)
         if self.combo.get() == self.NEW:
             self.new_entry.focus_set()
         else:
@@ -1010,7 +1056,8 @@ class AppLauncherTab:
         """Word-wrap `name` into at most max_lines of ~width characters each.
 
         tk.Label has no built-in wrapping, so newlines are inserted manually;
-        text that doesn't fit is truncated with an ellipsis.
+        any line that doesn't fit its width is truncated with an ellipsis
+        (this also covers a single long word, which can't be wrapped).
         """
         words = name.split()
         lines, line = [], ""
@@ -1020,16 +1067,13 @@ class AppLauncherTab:
             else:
                 lines.append(line)
                 line = word
-                if len(lines) == max_lines:
+                if len(lines) >= max_lines:
                     break  # `line` would become a (max_lines+1)-th line
-        else:
-            if line:
-                lines.append(line)
-            return "\n".join(lines)
-        # Overflow: mark the final line as truncated.
-        room = max(width - 1, 1)
-        last = lines[-1]
-        lines[-1] = last[:room] + "…" if len(last) > room else last + "…"
+        if line and len(lines) < max_lines:
+            lines.append(line)
+        for i, l in enumerate(lines):
+            if len(l) > width:
+                lines[i] = l[: max(width - 1, 0)] + "…"
         return "\n".join(lines)
 
     def _icon_for(self, path):
@@ -1100,8 +1144,14 @@ class AppLauncherTab:
         if target is not None and target != drag["index"]:
             app = self.apps.pop(drag["index"])
             self.apps.insert(target, app)
+            # Swap the two cells' grid slots so the icons visibly follow the
+            # new order (and cells[i] stays in sync with apps[i]).
+            a, b = drag["index"], target
+            cols = max(1, self.canvas.winfo_width() // (self.CELL_W + 8))
+            self.cells[a].grid(row=b // cols, column=b % cols, padx=4, pady=6)
+            self.cells[b].grid(row=a // cols, column=a % cols, padx=4, pady=6)
+            self.cells[a], self.cells[b] = self.cells[b], self.cells[a]
             drag["index"] = target
-            self._relayout()
         self._set_cell_bg(drag["index"], self.DRAG_BG)
 
     def _on_release(self, event):
@@ -1253,10 +1303,40 @@ class MainApp:
 
 
 def main():
-    settings = load_settings()
-    set_data_folder(settings["data_folder"])  # creates the data files if missing
     root = tk.Tk()
+    root.withdraw()  # stay hidden while the data folder is resolved
+    settings = load_settings()
+    folder = settings["data_folder"]
+    if not os.path.isdir(folder):
+        if folder == default_data_folder():
+            # First run (no settings.json yet): bootstrap the app's own
+            # data folder.
+            os.makedirs(folder, exist_ok=True)
+        else:
+            # The configured data folder is gone (deleted or moved). Ask the
+            # user to pick an existing one; on cancel, revert to the default.
+            # A stale folder is never recreated silently.
+            messagebox.showinfo(
+                APP_NAME,
+                f"The data folder no longer exists:\n{folder}\n\n"
+                "Please choose an existing folder where your data should be stored.",
+            )
+            chosen = filedialog.askdirectory(title="Choose the data folder", parent=root)
+            if chosen:
+                settings["data_folder"] = os.path.normpath(chosen)
+            else:  # cancelled — revert to the default data folder
+                settings["data_folder"] = default_data_folder()
+                os.makedirs(settings["data_folder"], exist_ok=True)
+            save_settings(settings)
+    set_data_folder(settings["data_folder"])  # creates the data files if missing
+    icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "swiss-army.ico")
+    if os.path.isfile(icon):
+        try:
+            root.iconbitmap(icon)
+        except tk.TclError:  # e.g. unsupported .ico on this Tk build
+            pass
     MainApp(root, settings)
+    root.deiconify()
     root.mainloop()
 
 
