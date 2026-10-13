@@ -1,0 +1,16 @@
+{
+  "apps": [
+    {
+      "name": "Swiss Army Tool",
+      "path": "D:\\_Apps\\swiss-army\\swiss-army.bat"
+    },
+    {
+      "name": "chronoterm.bat",
+      "path": "D:\\_Apps\\job-time-tracker\\chronoterm-'84-retro-time-tracker-1.0\\chronoterm.bat"
+    },
+    {
+      "name": "PNG 2 ICO",
+      "path": "D:\\_Apps\\PNG2ICOjs\\PNG2ICO.bat"
+    }
+  ]
+}

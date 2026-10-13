@@ -1,0 +1,64 @@
+{
+  "categories": [
+    {
+      "name": "System",
+      "entries": [
+        {
+          "name": ".cache",
+          "path": "C:\\Users\\hanze\\.cache"
+        },
+        {
+          "name": "AppData",
+          "path": "C:\\Users\\hanze\\AppData"
+        },
+        {
+          "name": "Downloads",
+          "path": "C:\\Users\\hanze\\Downloads"
+        },
+        {
+          "name": "Documents",
+          "path": "C:\\Users\\hanze\\Documents"
+        }
+      ]
+    },
+    {
+      "name": "AI",
+      "entries": [
+        {
+          "name": ".unsloth",
+          "path": "C:\\Users\\hanze\\.unsloth"
+        },
+        {
+          "name": "opencode",
+          "path": "C:\\Users\\hanze\\.config\\opencode"
+        },
+        {
+          "name": "Strata",
+          "path": "R:\\AI\\LLM\\Strata"
+        }
+      ]
+    },
+    {
+      "name": "Video Editing",
+      "entries": [
+        {
+          "name": ".LUT",
+          "path": "C:\\Users\\hanze\\AppData\\Roaming\\Blackmagic Design\\DaVinci Resolve\\Support\\.LUT"
+        }
+      ]
+    },
+    {
+      "name": "Coding",
+      "entries": [
+        {
+          "name": "_Apps",
+          "path": "D:\\_Apps"
+        }
+      ]
+    },
+    {
+      "name": "Gaming",
+      "entries": []
+    }
+  ]
+}

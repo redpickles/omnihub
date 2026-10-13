@@ -1,0 +1,159 @@
+# --- Operating System Files ---
+# Windows
+[Dd]esktop.ini
+Thumbs.db
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+._*
+
+# Linux
+.directory
+*~
+
+# --- Editor / IDE ---
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+
+# Sublime Text
+*.sublime-*
+*.sublime-workspace
+
+# --- Language & Framework Specific ---
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.mypy_cache/
+.python-version
+pip-log.txt
+pip-delete-this-directory.txt
+venv/
+.venv/
+env/
+.ENV/
+env.bak/
+.venv.bak/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+.pnp.js
+.yarn-integrity
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.yarn/versions/
+.yarn/patches/
+.yarn/plugins/
+.yarn/sdks/
+.yarn/versions/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Compiled binary addons (http://nodejs.org/api/addons.html)
+build/Release/
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Go
+bin/
+/pkg/
+
+# --- Project & Environment ---
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build output
+/dist/
+/build/
+/out/
+
+# Temporary folders
+.temp/
+.tmp/
+/cache/
+
+# Misc
+.sass-cache/
+.parcel-cache/
+.next/
+.nuxt/
+
+# other files
+*.7z
+test.php
+prepros.config
+_backup/
+_archive/
+
+# --- Package Manager Lock Files ---
+# !!! READ THIS !!!
+# You should NOT ignore lock files if you want reproducible builds.
+# They are crucial for ensuring everyone uses the exact same dependencies.
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+# Pipfile.lock
+# Gemfile.lock
+# Cargo.lock
