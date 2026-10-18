@@ -1,4 +1,4 @@
-# Version 1.0.1.6
+# Version 1.0.1.7
 
 # OmniHub
 
@@ -74,6 +74,6 @@ Choose where your data is stored.
 venv\Scripts\python.exe app.py
 ```
 
-Or just double-click **omnihub.bat** (uses the venv automatically; only keeps the console window open if the app fails to start).
+Or just double-click **omnihub.bat**. It uses the bundled `venv/` automatically; if that folder is missing it creates one (`python -m venv`), upgrades pip, installs `requirements.txt`, then launches. It only keeps the console window open if the app fails to start.
 
 

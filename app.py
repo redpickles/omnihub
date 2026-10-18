@@ -22,7 +22,7 @@ import zlib
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 APP_NAME = "OmniHub"
-VERSION = "1.0.1.6"
+VERSION = "1.0.1.7"
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "folders.json")
 
 
