@@ -1,6 +1,6 @@
-# Version 1.0.1.5
+# Version 1.0.1.6
 
-# Launcher Hub
+# OmniHub
 
 A tabbed Python desktop app with one tab per tool.
 
@@ -50,6 +50,11 @@ magick icon.png icon.ico
 
 Or open the PNG in GIMP and use *File → Export As* with the `.ico` format.
 
+### Tools
+Small, self-contained utility tools, added one at a time.
+
+- **KB → Bytes** — enter a number of kilobytes and get the byte count instantly. Type a value and the result updates live (value × 1024); click the copy icon to the right of the result to copy it to the clipboard.
+
 ### Settings
 Choose where your data is stored.
 
@@ -69,6 +74,6 @@ Choose where your data is stored.
 venv\Scripts\python.exe app.py
 ```
 
-Or just double-click **swiss-army.bat** (uses the venv automatically; only keeps the console window open if the app fails to start).
+Or just double-click **omnihub.bat** (uses the venv automatically; only keeps the console window open if the app fails to start).
 
 

@@ -1,13 +1,14 @@
-# AI State — Launcher Hub (swiss-army)
+# AI State — OmniHub (omnihub)
 
-Last updated: 2026-10-13 · Session focus: bug sweep + startup data-folder prompt (no silent folder creation) + default moved to `data/`. **Version 1.0.1.5.**
+Last updated: 2026-10-17 · Session focus: rebranded the app to OmniHub (was "Launcher Hub"/swiss-army). **Version 1.0.1.6.**
 
 ## 1. Project Overview
 
-A single-window Python desktop app ("Launcher Hub") with three tabs:
+A single-window Python desktop app ("OmniHub") with four tabs:
 
 - **Folder Launcher** — frequently used folders organized by category, opened via Windows Explorer.
 - **App Launcher** — shortcuts to app files (`.exe`/`.bat`/`.cmd`/`.lnk`) shown as an Android-home-screen-style icon grid; double-click launches, drag reorders.
+- **Tools** — small, self-contained utility tools in stacked panels. Ships with **KB → Bytes** (value × 1024, live result, copy-to-clipboard icon).
 - **Settings** — choose the data folder where `apps.json` and `folders.json` are stored; both are created automatically if missing.
 
 All tabs persist their data to JSON files in the data folder and survive restarts.
@@ -21,12 +22,12 @@ All tabs persist their data to JSON files in the data folder and survive restart
 | File | Purpose |
 |---|---|
 | `app.py` (~1300 lines) | The entire application: persistence, settings, icon engine, all three tabs, dialogs |
-| `swiss-army.bat` | Launcher: uses `venv\Scripts\python.exe` if present, else system `python`; `pause` only on `errorlevel 1` so a clean close doesn't leave a cmd window |
+| `omnihub.bat` | Launcher: uses `venv\Scripts\python.exe` if present, else system `python`; `pause` only on `errorlevel 1` so a clean close doesn't leave a cmd window |
 | `settings.json` | App settings (`{"data_folder": ...}`); created when the user first browses; absent = default data folder is the `data` subdirectory next to the app |
 | `apps.json` | App Launcher data (lives in the **data folder**) |
 | `folders.json` | Folder Launcher data (lives in the **data folder**) |
 | `README.md` | User-facing docs, current as of v1.0.1.5 |
-| `swiss-army.ico` | App icon, applied as the window icon in `main()` |
+| `omnihub.ico` | App icon, applied as the window icon in `main()` |
 | `.gitignore` | Generic multi-language ignore file; `venv/`, `__pycache__/` ignored |
 | `venv/` | Virtual environment (no packages installed in it) |
 
@@ -92,7 +93,7 @@ Adopted patterns that aren't obvious from the config files:
 - **In-place mutation helpers** return a success flag; the caller persists and refreshes (e.g. `delete_category_with_migration`).
 - **Tk gotchas encoded in comments:** Treeview items insert **closed** by default on Tk 8.6.15 (must pass `open=True`); `tree.parent()` returns `''` not `None` for top-level items; `tree.selection()` returns **string item IDs**, not list indices (use `tree.index(id)`); `PhotoImage` is RGB-only (flatten alpha onto a background).
 - **Keep PhotoImages referenced** (`self._images`) or Tk silently drops them.
-- `APP_NAME = "Launcher Hub"` is used as the title for **all** messageboxes/dialogs (was "Folder Launcher" pre-v1.0.1.2). `VERSION` constant lives next to it.
+- `APP_NAME = "OmniHub"` is used as the title for **all** messageboxes/dialogs (was "Folder Launcher" pre-v1.0.1.2). `VERSION` constant lives next to it.
 - The `.bat` launcher only `pause`s on failure (`if errorlevel 1 pause`) so a clean exit doesn't strand a console window.
 
 ## 6. Current Status & Roadmap
@@ -101,7 +102,7 @@ Adopted patterns that aren't obvious from the config files:
 - Folder Launcher: full CRUD for folders and categories, category-deletion migration dialog, alphabetical display, expanded-by-default categories, persistence, legacy-format migration.
 - App Launcher: add/rename/remove (with confirmation), drag-to-reorder with live reflow, double-click launch, right-click menu, responsive scrollable icon grid, word-wrapped labels, PNG + DIB `.ico` decoding.
 - Settings tab: browse for the data folder, choice persisted in `settings.json`, auto-creation of missing `apps.json`/`folders.json`, both tabs reload after a folder change.
-- `swiss-army.bat`: venv-aware launcher, no lingering console window on clean exit.
+- `omnihub.bat`: venv-aware launcher, no lingering console window on clean exit.
 - README.md current as of v1.0.1.1.
 
 ### ✅ Fixed in v1.0.1.2 (superseded by the v1.0.1.3/4 startup prompt)
@@ -119,6 +120,11 @@ Adopted patterns that aren't obvious from the config files:
 - **Startup data-folder prompt**: `main()` checks the configured data folder before building the UI. If it no longer exists, the user gets an info box + `askdirectory` to pick an **existing** one (persisted to `settings.json`). Cancelling reverts to the default — the `data` subdirectory next to the app (also persisted). The root window is withdrawn while this resolves and deiconified only after `MainApp` is built, so no empty window flashes.
 - **Default data folder is now `data/`**: `default_data_folder()` returns `<script dir>\data`; `load_settings()` falls back to it when `settings.json` is absent/corrupt. First run (configured folder *is* the default and missing) bootstraps it without prompting.
 - **No silent folder creation**: `set_data_folder()` no longer calls `os.makedirs`. Callers guarantee the folder exists (startup prompt, Settings-tab picker, or the `data/` bootstrap). Pointing it at a missing folder now raises `OSError` on save instead of creating the folder.
+
+### ✅ Added in v1.0.1.6
+
+- **Rebranded to OmniHub**: app title, dialog names (`APP_NAME`), module docstring, and launcher renamed from "Launcher Hub"/`swiss-army` to "OmniHub"/`omnihub`. `swiss-army.bat` → `omnihub.bat`, `swiss-army.ico` → `omnihub.ico`. Project directory `D:\_Apps\swiss-army` left unchanged (would break the absolute `data_folder`/app paths).
+- **Tools tab**: new tab between App Launcher and Settings holding small utility tools in stacked panels. Ships with **KB → Bytes** (value × 1024, live result, copy-to-clipboard icon).
 
 ### 🚧 Known Gaps
 - Cosmetic: antialiased icon edges can show a faint mismatch against the selection highlight (inherent to RGB-only PhotoImage; flattening happens at load time, before selection).

@@ -96,6 +96,7 @@ pids/
 *.pid
 *.seed
 *.pid.lock
+data/
 
 # Compiled binary addons (http://nodejs.org/api/addons.html)
 build/Release/

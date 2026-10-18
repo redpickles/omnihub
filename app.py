@@ -1,4 +1,4 @@
-"""Launcher Hub — a tabbed desktop app with one tab per tool.
+"""OmniHub — a tabbed desktop app with one tab per tool.
 
 Tabs:
   * Folder Launcher — keep track of frequently used folders, organized by category.
@@ -21,8 +21,8 @@ import tkinter as tk
 import zlib
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-APP_NAME = "Launcher Hub"
-VERSION = "1.0.1.5"
+APP_NAME = "OmniHub"
+VERSION = "1.0.1.6"
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "folders.json")
 
 
@@ -1274,11 +1274,184 @@ class SettingsTab:
         self.on_change()
 
 
+class ToolsTab:
+    """The Tools tab: small, self-contained utility tools.
+
+    Currently holds one tool — a Bytes → KB multiplier (value × 1024) —
+    with a numbers-only input, a live result, and a copy-to-clipboard button.
+    Tools are stacked as independent panels so more can be added later
+    without restructuring the tab.
+    """
+
+    def __init__(self, parent):
+        self.parent = parent
+        self._build_ui()
+
+    def _build_ui(self):
+        frame = ttk.Frame(self.parent, padding=(8, 8))
+        frame.pack(fill="both", expand=True)
+
+        # One panel per tool; add more panels below this one.
+        self.panels = ttk.Frame(frame)
+        self.panels.pack(fill="x")
+
+        self._add_bytes_to_kb_tool()
+
+    def _add_bytes_to_kb_tool(self):
+        panel = ttk.LabelFrame(self.panels, text="KB → Bytes", padding=(10, 8))
+        panel.pack(fill="x")
+
+        row = ttk.Frame(panel)
+        row.pack(fill="x")
+
+        ttk.Label(row, text="Enter KB:").pack(side="left")
+
+        self._bytes_var = tk.StringVar(value="")
+        vcmd = self.parent.register(self._validate_bytes)
+        self.bytes_entry = tk.Entry(
+            row,
+            textvariable=self._bytes_var,
+            width=14,
+            validate="key",
+            validatecommand=(vcmd, "%P"),
+        )
+        self.bytes_entry.pack(side="left", padx=(6, 0))
+        self._bytes_var.trace_add("write", self._update_result)
+
+        ttk.Label(row, text="× 1024 =").pack(side="left", padx=(10, 0))
+
+        self.result_var = tk.StringVar(value="0")
+        self.result_label = tk.Label(
+            row,
+            textvariable=self.result_var,
+            width=18,
+            anchor="w",
+            relief="sunken",
+            borderwidth=1,
+            background="#f5f5f5",
+        )
+        self.result_label.pack(side="left", padx=(4, 0))
+
+        self._copy_btn = tk.Frame(row, width=30, height=30, takefocus=0)
+        self._copy_btn.pack(side="left", padx=(10, 0))
+        self._copy_btn.pack_propagate(False)
+        self._copy_canvas = tk.Canvas(
+            self._copy_btn,
+            width=24,
+            height=24,
+            highlightthickness=0,
+            background=self._copy_btn.cget("background"),
+            takefocus=0,
+        )
+        self._copy_canvas.pack(side="left")
+        self._copy_canvas.bind("<Button-1>", self._copy_answer)
+        self._copy_canvas.bind(
+            "<Enter>", lambda e: self._copy_canvas.configure(cursor="hand2")
+        )
+        self._copy_canvas.bind(
+            "<Leave>", lambda e: self._copy_canvas.configure(cursor="")
+        )
+        self._draw_copy_icon()
+        self._bind_tooltip(self._copy_canvas, "Copy to clipboard")
+
+    # -------------------------------------------------------------- helpers
+
+    @staticmethod
+    def _validate_bytes(new):
+        """Allow an empty field, digits, and at most one decimal point."""
+        if new == "":
+            return True
+        if new.count(".") > 1:
+            return False
+        return new.replace(".", "", 1).isdigit()
+
+    @staticmethod
+    def _format_number(n):
+        """Show whole numbers without a trailing .0; compact otherwise."""
+        if n == int(n):
+            return str(int(n))
+        return f"{n:g}"
+
+    def _update_result(self, *args):
+        text = self._bytes_var.get()
+        if text == "":
+            self.result_var.set("")
+            return
+        try:
+            value = float(text)
+        except ValueError:
+            return
+        self.result_var.set(self._format_number(value * 1024))
+
+    def _draw_copy_icon(self, accent=False):
+        c = self._copy_canvas
+        c.delete("all")
+        if accent:
+            back_fill, back_outline = "#8bc34a", "#4caf50"
+            front_fill, front_outline, line = "#e8f5e9", "#2e7d32", "#2e7d32"
+        else:
+            back_fill, back_outline = "#c5c5c5", "#8a8a8a"
+            front_fill, front_outline, line = "#ffffff", "#3a3a3a", "#3a3a3a"
+        # Rear document: a box offset up-and-to-the-right.
+        c.create_rectangle(10, 4, 18, 14, outline=back_outline, fill=back_fill, width=1.5)
+        # Front document: same size, offset down-and-to-the-left — the classic
+        # "copy" glyph.
+        c.create_rectangle(
+            6, 8, 14, 18, outline=front_outline, fill=front_fill, width=2
+        )
+        # Two lines of "text" on the front document.
+        c.create_line(8, 12, 12, 12, fill=line, width=1.5, capstyle="round")
+        c.create_line(8, 15, 11, 15, fill=line, width=1.5, capstyle="round")
+
+    def _bind_tooltip(self, widget, text):
+        """Show a small stdlib tooltip near `widget` on hover."""
+        label = tk.Label(
+            self.parent.winfo_toplevel(),
+            text=text, relief="solid", borderwidth=1,
+            background="#ffffd0", foreground="#222222",
+            font=("Segoe UI", 8),
+        )
+        state = {"id": None}
+
+        def show():
+            state["id"] = None
+            x = widget.winfo_rootx() + widget.winfo_width() + 4
+            y = widget.winfo_rooty()
+            label.place(x=x, y=y, anchor="w")
+
+        def schedule_show():
+            label.place_forget()
+            state["id"] = widget.after(400, show)
+
+        def hide():
+            if state["id"] is not None:
+                widget.after_cancel(state["id"])
+            state["id"] = None
+            label.place_forget()
+
+        widget.bind("<Enter>", lambda e: schedule_show())
+        widget.bind("<Leave>", lambda e: hide())
+
+    def _copy_answer(self, event=None):
+        value = self.result_var.get().strip()
+        if not value:
+            return
+        top = self.parent.winfo_toplevel()
+        try:
+            top.clipboard_clear()
+            top.clipboard_append(value)
+        except tk.TclError:
+            return
+        top.update_idletasks()
+        self._draw_copy_icon(accent=True)
+        self._copy_canvas.after(350, self._draw_copy_icon)
+
+
 class MainApp:
     """The main window: a notebook with one tab per app."""
 
     def __init__(self, root: tk.Tk, settings):
-        root.title("Launcher Hub")
+        root.title("OmniHub")
         root.geometry("700x520")
 
         notebook = ttk.Notebook(root)
@@ -1291,6 +1464,10 @@ class MainApp:
         apps_tab = ttk.Frame(notebook)
         notebook.add(apps_tab, text="App Launcher")
         self.apps_tab = AppLauncherTab(apps_tab)
+
+        tools_tab = ttk.Frame(notebook)
+        notebook.add(tools_tab, text="Tools")
+        self.tools_tab = ToolsTab(tools_tab)
 
         settings_tab = ttk.Frame(notebook)
         notebook.add(settings_tab, text="Settings")
@@ -1329,7 +1506,7 @@ def main():
                 os.makedirs(settings["data_folder"], exist_ok=True)
             save_settings(settings)
     set_data_folder(settings["data_folder"])  # creates the data files if missing
-    icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "swiss-army.ico")
+    icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "omnihub.ico")
     if os.path.isfile(icon):
         try:
             root.iconbitmap(icon)
