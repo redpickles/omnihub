@@ -25,7 +25,7 @@ Keep track of your frequently used folders — organized by category — and ope
 ### App Launcher
 Shortcuts to frequently used app files, laid out as a grid of icons like an Android home screen: icon on top, label below.
 
-- **Add app…** — browse for an app file (`*.exe`, `*.bat`, `*.cmd`, `*.lnk`, or any file); it's added to the grid and persisted in `apps.json`.
+- **Add app…** — browse for an app file (`*.exe`, `*.bat`, `*.cmd`, `*.lnk`, `*.html`, or any file); it's added to the grid and persisted in `apps.json`. HTML files open in your default browser when launched.
 - **Click** an icon to select it; **double-click** to launch it.
 - **Drag** an icon over another to reorder the grid — the new order is saved automatically.
 - **Right-click** for quick actions: Open / Rename… / Remove (asking for confirmation).

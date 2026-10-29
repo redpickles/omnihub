@@ -1,6 +1,6 @@
 # AI State — OmniHub
 
-Last updated: 2026-10-17 · **v1.0.1.7.** Single-window Tk desktop app.
+Last updated: 2026-10-29 · **v1.0.1.7.** Single-window Tk desktop app.
 
 ## 1. Project Overview
 
@@ -60,11 +60,7 @@ All features complete — Folder Launcher, App Launcher, Tools (KB→Bytes), Set
 - Folder entries aren't validated at load time — a missing folder surfaces only when you try to open it.
 
 ## Latest Session Delta
-- Rewrote `omnihub.bat`: activate `venv/` if present, else create it + install `requirements.txt`, then run `app.py`.
-- Recreated `venv/` (copied from `folder-launcher` with a wrong hardcoded `VIRTUAL_ENV`); activation now resolves to `D:\_Apps\omnihub\venv`.
-- Regenerated `requirements.txt` (empty — stdlib-only); prior file had a stray `zxcvbn==4.5.0` from system pip.
-- Bumped 1.0.1.6 → 1.0.1.7 (`app.py`, `ai_state.md`).
-- Fixed `omnihub.bat` crash — parens in an `echo` inside the `if (...)` block errored CMD; removed them.
+- App Launcher now accepts `*.html`: added to the "All supported" filter and a new "Web pages" filter in `add_app()` (`app.py`); README updated. HTML entries still launch via `os.startfile()` → default browser (no launch-logic change).
 
 ## Immediate Next Actions
 1. Optionally validate folder entries at load time in `load_store()` (flag/drop missing paths) — `app.py`.

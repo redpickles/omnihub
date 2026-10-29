@@ -1171,10 +1171,11 @@ class AppLauncherTab:
             title="Choose an app file",
             parent=self.parent,
             filetypes=[
-                ("All supported", "*.exe;*.bat;*.cmd;*.lnk"),
+                ("All supported", "*.exe;*.bat;*.cmd;*.lnk;*.html"),
                 ("Executables", "*.exe"),
                 ("Batch files", "*.bat;*.cmd"),
                 ("Shortcuts", "*.lnk"),
+                ("Web pages", "*.html"),
                 ("All files", "*.*"),
             ],
         )
