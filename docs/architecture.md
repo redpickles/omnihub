@@ -58,6 +58,8 @@ Tk's `PhotoImage` cannot display `.ico`, so the ICO container is parsed by hand:
 - `tree.parent()` returns `''`, not `None`, for root items.
 - `tree.selection()` returns **string item IDs**, not indices — use `tree.index(id)`.
 - `root.iconbitmap()` may raise `TclError` on an unsupported `.ico`; it is wrapped in `try/except` in `main()`.
+- Headless testing: a `withdraw()`n root reports winfo size 1×1 — call `deiconify()` + `update()` before geometry asserts (`pack_propagate(False)` cells then measure their real pixel size).
+- Keyboard shortcuts on Windows: a plain Ctrl+letter sends the lowercase-derived virtual event (`<Control-c>`; uppercase `<Control-C>` only with Shift) — bind both. Non-Latin keyboard layouts (e.g. Cyrillic) match **neither** name (bpo-46052), but the `<Key>` event always fires and `event.char` is the control character (code 3 for Ctrl+C) — a `<Key>` binding guarded on `event.char == "\x03"` is layout-proof. `event_generate` fires a binding for the literal virtual-event name given but cannot synthesize real control-character chars (unknown keysym) and cannot synthesize `<Button-1>`.
 
 ## venv Notes
 

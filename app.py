@@ -22,7 +22,7 @@ import zlib
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 APP_NAME = "OmniHub"
-VERSION = "1.0.1.7"
+VERSION = "1.0.1.8"
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "folders.json")
 
 
@@ -1278,11 +1278,24 @@ class SettingsTab:
 class ToolsTab:
     """The Tools tab: small, self-contained utility tools.
 
-    Currently holds one tool — a Bytes → KB multiplier (value × 1024) —
-    with a numbers-only input, a live result, and a copy-to-clipboard button.
+    Holds independent stacked panels, one per tool:
+
+    * KB → Bytes — numbers-only input, live × 1024 result, copy button.
+    * Mini Simple Spreadsheet — a 3-column grid: five editable rows plus a
+      sixth row of live, bold, non-editable column sums. Clicking a sum
+      selects it (no editing possible); Ctrl+C copies the selected sum to
+      the clipboard; a "Clear all" button empties the grid.
+
     Tools are stacked as independent panels so more can be added later
     without restructuring the tab.
     """
+
+    _SPREAD_ROWS = 5  # editable rows; the sixth row holds the column sums
+    _SPREAD_COLS = 3
+    _SPREAD_CELL_W = 96  # fixed cell size in px (inputs and sums match)
+    _SPREAD_CELL_H = 26
+    _SPREAD_BG = "#f5f5f5"  # sum cell color (matches the KB tool's result)
+    _SPREAD_SELECTED_BG = "#b6d7f0"  # sum cell color while selected
 
     def __init__(self, parent):
         self.parent = parent
@@ -1297,6 +1310,7 @@ class ToolsTab:
         self.panels.pack(fill="x")
 
         self._add_bytes_to_kb_tool()
+        self._add_mini_spreadsheet_tool()
 
     def _add_bytes_to_kb_tool(self):
         panel = ttk.LabelFrame(self.panels, text="KB → Bytes", padding=(10, 8))
@@ -1355,11 +1369,111 @@ class ToolsTab:
         self._draw_copy_icon()
         self._bind_tooltip(self._copy_canvas, "Copy to clipboard")
 
+    def _add_mini_spreadsheet_tool(self):
+        panel = ttk.LabelFrame(
+            self.panels, text="Mini Simple Spreadsheet", padding=(10, 8)
+        )
+        panel.pack(fill="x", pady=(10, 0))
+
+        # "Clear all" hugs the top-right corner of the panel, opposite the
+        # panel's label text.
+        head = ttk.Frame(panel)
+        head.pack(fill="x")
+        self._clear_btn = ttk.Button(
+            head, text="Clear all", command=self._clear_spreadsheet
+        )
+        self._clear_btn.pack(side="right")
+
+        table = ttk.Frame(panel)
+        table.pack(fill="both", expand=True)
+
+        # Five editable rows of signed-number cells. Each cell lives in a
+        # fixed-size box, so input boxes and sum boxes are exactly equal;
+        # padx/pady=(0, 2) leaves only a 2px gap between rows and columns.
+        vcmd = self.parent.register(self._validate_signed_number)
+        self._spread_vars = []
+        self._spread_entries = []
+        self._spread_boxes = []
+        for r in range(self._SPREAD_ROWS):
+            for c in range(self._SPREAD_COLS):
+                var = tk.StringVar(value="")
+                var.trace_add("write", self._update_spread_sums)
+                box = tk.Frame(
+                    table, width=self._SPREAD_CELL_W, height=self._SPREAD_CELL_H
+                )
+                box.grid(row=r, column=c, padx=(0, 2), pady=(0, 2))
+                box.pack_propagate(False)
+                entry = tk.Entry(
+                    box,
+                    textvariable=var,
+                    validate="key",
+                    validatecommand=(vcmd, "%P"),
+                )
+                entry.pack(fill="both", expand=True)
+                self._spread_boxes.append(box)
+                self._spread_entries.append(entry)
+                self._spread_vars.append(var)
+
+        # Sixth row: live column sums. Labels, not Entries — they can never
+        # be edited, so clicking one just selects it (light blue).
+        self._spread_sum_vars = []
+        self._spread_sum_labels = []
+        for c in range(self._SPREAD_COLS):
+            var = tk.StringVar(value="0")
+            box = tk.Frame(
+                table, width=self._SPREAD_CELL_W, height=self._SPREAD_CELL_H
+            )
+            box.grid(row=self._SPREAD_ROWS, column=c, padx=(0, 2), pady=(0, 2))
+            box.pack_propagate(False)
+            label = tk.Label(
+                box,
+                textvariable=var,
+                anchor="c",
+                relief="sunken",
+                borderwidth=1,
+                background=self._SPREAD_BG,
+                font=("Segoe UI", 10, "bold"),
+            )
+            label.pack(fill="both", expand=True)
+            label.bind(
+                "<Button-1>", lambda e, cell=c: self._select_spread_sum(cell)
+            )
+            self._spread_boxes.append(box)
+            self._spread_sum_vars.append(var)
+            self._spread_sum_labels.append(label)
+        self._spread_selected = None
+
+        # Ctrl+C anywhere in the window copies the selected total box to the
+        # clipboard. Bound on the top window so the event is caught no
+        # matter which widget currently holds keyboard focus. A plain Ctrl+C
+        # on Windows sends the lowercase virtual event <Control-c> (the
+        # uppercase <Control-C> only arrives with Shift), and non-Latin
+        # keyboard layouts can match neither name — so every <Key> event is
+        # bound too, and the handler checks for the Ctrl+C character code 3.
+        top = self.parent.winfo_toplevel()
+        top.bind("<Control-c>", self._copy_selected_sum)
+        top.bind("<Control-C>", self._copy_selected_sum)
+        top.bind("<Key>", self._copy_selected_sum)
+
     # -------------------------------------------------------------- helpers
 
     @staticmethod
     def _validate_bytes(new):
         """Allow an empty field, digits, and at most one decimal point."""
+        if new == "":
+            return True
+        if new.count(".") > 1:
+            return False
+        return new.replace(".", "", 1).isdigit()
+
+    @staticmethod
+    def _validate_signed_number(new):
+        """Spreadsheet cells: empty, an optional leading minus, digits, and
+        at most one decimal point. A lone "-" is accepted while typing so
+        negatives can start with the minus; such cells are skipped by the
+        sum until they parse as numbers."""
+        if new.startswith("-"):
+            new = new[1:]
         if new == "":
             return True
         if new.count(".") > 1:
@@ -1446,6 +1560,71 @@ class ToolsTab:
         top.update_idletasks()
         self._draw_copy_icon(accent=True)
         self._copy_canvas.after(350, self._draw_copy_icon)
+
+    # ------------------------------------------ mini simple spreadsheet
+
+    def _update_spread_sums(self, *args):
+        """Trace callback: recompute all three column sums after any edit."""
+        for c in range(self._SPREAD_COLS):
+            total = 0.0
+            for r in range(self._SPREAD_ROWS):
+                text = self._spread_vars[r * self._SPREAD_COLS + c].get()
+                if text:
+                    try:
+                        total += float(text)
+                    except ValueError:
+                        pass
+            self._spread_sum_vars[c].set(self._format_number(total))
+
+    def _select_spread_sum(self, cell):
+        """Toggle a sum cell's selection; sums can't be edited, only selected.
+
+        Clicking selects (light blue background); clicking the selected cell
+        again deselects it. Clicking another sum moves the selection.
+        """
+        label = self._spread_sum_labels[cell]
+        if self._spread_selected == cell:
+            self._spread_selected = None
+            label.configure(background=self._SPREAD_BG)
+        else:
+            if self._spread_selected is not None:
+                self._spread_sum_labels[self._spread_selected].configure(
+                    background=self._SPREAD_BG
+                )
+            self._spread_selected = cell
+            label.configure(background=self._SPREAD_SELECTED_BG)
+
+    def _clear_spreadsheet(self):
+        """Empty every editable cell; the write traces reset the sums to 0."""
+        for var in self._spread_vars:
+            var.set("")
+
+    def _copy_selected_sum(self, event):
+        """Ctrl+C handler: copy the selected total box's value to the clipboard.
+
+        Proceeds only for Ctrl+C: the typed character code 3 (which Windows
+        reports on every keyboard layout) or events without a keysym (named
+        bindings / synthetic events). Other keystrokes — including Enter and
+        Backspace, whose char is not code 3 — are ignored.
+        """
+        if self._spread_selected is None:
+            return
+        if event is not None:
+            if event.char:
+                if event.char != "\x03":
+                    return
+            elif event.keysym not in ("", None):
+                return
+        value = self._spread_sum_vars[self._spread_selected].get().strip()
+        if not value:
+            return
+        top = self.parent.winfo_toplevel()
+        try:
+            top.clipboard_clear()
+            top.clipboard_append(value)
+        except tk.TclError:
+            return
+        top.update_idletasks()
 
 
 class MainApp:
