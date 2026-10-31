@@ -52,6 +52,16 @@ Tk's `PhotoImage` cannot display `.ico`, so the ICO container is parsed by hand:
 - `_locate(item_id)` maps a Treeview item ID → `(category_index, entry_index)`; every action routes through it, so nothing else may assume positional indices.
 - `CategoryManagerDialog` is destroyed by `reload()` because it holds a reference to the store it was built from; otherwise it would mutate a stale copy.
 
+## Mini Simple Spreadsheet Internals (Tools tab)
+
+- One `ttk.Frame table` holds 19 fixed-size `tk.Frame` boxes placed on the ttk grid: rows 0–4 × cols 0–2 are editable `tk.Entry` cells, row `_SPREAD_ROWS` (the sixth row) holds the three column-sum `tk.Label`s plus the **grand-total** label at column `_SPREAD_COLS`. All four totals live in the same lists — `_spread_sum_vars` / `_spread_sum_labels` / `_spread_sum_bg`, index `_SPREAD_COLS` being the grand total (aliased by `self._spread_grand_var` / `_spread_grand_label`) — so selection and Ctrl+C treat it exactly like a column sum. `pack_propagate(False)` keeps every box exactly `_SPREAD_CELL_W` × `_SPREAD_CELL_H` (96×26), so input and total boxes match; `padx/pady=(0, 2)` leaves exactly a 2px gap between rows **and** columns.
+- Colors: `_SPREAD_BG` `#f5f5f5` (unselected column sums, matches the KB tool's result), `_SPREAD_SELECTED_BG` `#b6d7f0` (any total while selected), `_SPREAD_GRAND_BG` `#f9fcb2` (grand total's **default**). `_spread_sum_bg[cell]` remembers each cell's own default, so deselecting restores `#f9fcb2` on the grand total instead of the shared gray.
+- Validation `_validate_signed_number`: empty, optional leading `-`, digits, at most one `.`. A lone `-` is accepted so negatives can start mid-typing; such cells are skipped by the sums until they parse.
+- Sums: only the 15 input StringVars carry a `write` trace → `_update_spread_sums` recomputes the three column totals (unparsable cells skipped) and the grand total, writing `_spread_sum_vars` / `_spread_grand_var` with `_format_number` (whole numbers drop `.0`, otherwise `%g`). Sum vars carry **no** trace, so the callback can't recurse. The grand total adds the three **float** column totals and formats once — rounding in the display strings can never make it disagree with the sum boxes.
+- Selection: all four total labels bind `<Button-1>` → `_select_spread_sum(cell)` with `cell` 0–3 tracked in `self._spread_selected`; clicking the selected cell deselects, clicking another moves.
+- Copy: `_copy_selected_sum` (bound per the keyboard gotchas above) copies `self._spread_sum_vars[self._spread_selected]`, which resolves index `_SPREAD_COLS` to the grand total.
+- `_clear_spreadsheet` only blanks the 15 input vars; the write traces reset the sums and the grand total to 0.
+
 ## Tk 8.6.15 Gotchas
 
 - Treeview items insert **closed** by default — pass `open=True` or children stay hidden.

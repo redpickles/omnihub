@@ -1282,9 +1282,11 @@ class ToolsTab:
 
     * KB → Bytes — numbers-only input, live × 1024 result, copy button.
     * Mini Simple Spreadsheet — a 3-column grid: five editable rows plus a
-      sixth row of live, bold, non-editable column sums. Clicking a sum
-      selects it (no editing possible); Ctrl+C copies the selected sum to
-      the clipboard; a "Clear all" button empties the grid.
+      sixth row of live, bold, non-editable totals — the three column sums
+      and a fourth grand-total box (pale yellow `#f9fcb2`) that adds them
+      up. Clicking any total selects it (no editing possible); Ctrl+C copies
+      the selected total to the clipboard; a "Clear all" button empties the
+      grid.
 
     Tools are stacked as independent panels so more can be added later
     without restructuring the tab.
@@ -1296,6 +1298,7 @@ class ToolsTab:
     _SPREAD_CELL_H = 26
     _SPREAD_BG = "#f5f5f5"  # sum cell color (matches the KB tool's result)
     _SPREAD_SELECTED_BG = "#b6d7f0"  # sum cell color while selected
+    _SPREAD_GRAND_BG = "#f9fcb2"  # grand-total cell color (always, never selected)
 
     def __init__(self, parent):
         self.parent = parent
@@ -1414,10 +1417,15 @@ class ToolsTab:
                 self._spread_entries.append(entry)
                 self._spread_vars.append(var)
 
-        # Sixth row: live column sums. Labels, not Entries — they can never
-        # be edited, so clicking one just selects it (light blue).
+        # Sixth row: live totals. Labels, not Entries — totals can never be
+        # edited, so clicking one just selects it (light blue). The fourth
+        # cell is the grand total: the three column sums added together, on
+        # its own pale-yellow background. All four are selectable and
+        # Ctrl+C-able; `_spread_sum_bg` remembers each cell's own default
+        # color so deselecting restores that one instead of the shared gray.
         self._spread_sum_vars = []
         self._spread_sum_labels = []
+        self._spread_sum_bg = []
         for c in range(self._SPREAD_COLS):
             var = tk.StringVar(value="0")
             box = tk.Frame(
@@ -1441,6 +1449,39 @@ class ToolsTab:
             self._spread_boxes.append(box)
             self._spread_sum_vars.append(var)
             self._spread_sum_labels.append(label)
+            self._spread_sum_bg.append(self._SPREAD_BG)
+
+        # Grand total: same fixed box and gap, one column further right, wired
+        # exactly like the column sums (click to select, Ctrl+C to copy) — the
+        # only difference is its own default background color.
+        self._spread_grand_var = tk.StringVar(value="0")
+        box = tk.Frame(
+            table, width=self._SPREAD_CELL_W, height=self._SPREAD_CELL_H
+        )
+        box.grid(
+            row=self._SPREAD_ROWS, column=self._SPREAD_COLS, padx=(0, 2), pady=(0, 2)
+        )
+        box.pack_propagate(False)
+        label = tk.Label(
+            box,
+            textvariable=self._spread_grand_var,
+            anchor="c",
+            relief="sunken",
+            borderwidth=1,
+            background=self._SPREAD_GRAND_BG,
+            font=("Segoe UI", 10, "bold"),
+        )
+        label.pack(fill="both", expand=True)
+        label.bind(
+            "<Button-1>",
+            lambda e, cell=self._SPREAD_COLS: self._select_spread_sum(cell),
+        )
+        self._spread_boxes.append(box)
+        self._spread_sum_vars.append(self._spread_grand_var)
+        self._spread_sum_labels.append(label)
+        self._spread_sum_bg.append(self._SPREAD_GRAND_BG)
+        self._spread_grand_label = label
+
         self._spread_selected = None
 
         # Ctrl+C anywhere in the window copies the selected total box to the
@@ -1564,7 +1605,12 @@ class ToolsTab:
     # ------------------------------------------ mini simple spreadsheet
 
     def _update_spread_sums(self, *args):
-        """Trace callback: recompute all three column sums after any edit."""
+        """Trace callback: recompute the column sums and the grand total.
+
+        The grand total adds the columns' float totals (not their rounded
+        display strings), so it always equals what the sum boxes show.
+        """
+        grand_total = 0.0
         for c in range(self._SPREAD_COLS):
             total = 0.0
             for r in range(self._SPREAD_ROWS):
@@ -1574,22 +1620,26 @@ class ToolsTab:
                         total += float(text)
                     except ValueError:
                         pass
+            grand_total += total
             self._spread_sum_vars[c].set(self._format_number(total))
+        self._spread_grand_var.set(self._format_number(grand_total))
 
     def _select_spread_sum(self, cell):
-        """Toggle a sum cell's selection; sums can't be edited, only selected.
+        """Toggle a total cell's selection; totals can't be edited, only selected.
 
         Clicking selects (light blue background); clicking the selected cell
-        again deselects it. Clicking another sum moves the selection.
+        again deselects it. Clicking another total moves the selection. Each
+        cell restores its own default color from `_spread_sum_bg` (the grand
+        total is paler yellow), so deselecting never flattens it to gray.
         """
         label = self._spread_sum_labels[cell]
         if self._spread_selected == cell:
             self._spread_selected = None
-            label.configure(background=self._SPREAD_BG)
+            label.configure(background=self._spread_sum_bg[cell])
         else:
             if self._spread_selected is not None:
                 self._spread_sum_labels[self._spread_selected].configure(
-                    background=self._SPREAD_BG
+                    background=self._spread_sum_bg[self._spread_selected]
                 )
             self._spread_selected = cell
             label.configure(background=self._SPREAD_SELECTED_BG)
