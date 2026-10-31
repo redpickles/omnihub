@@ -147,6 +147,7 @@ test.php
 prepros.config
 _backup/
 _archive/
+settings.json
 
 # --- Package Manager Lock Files ---
 # !!! READ THIS !!!
