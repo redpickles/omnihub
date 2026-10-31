@@ -8,8 +8,9 @@ Tabs:
     The list is persisted to folders.json next to this script.
   * App Launcher — shortcuts to frequently used app files, with icons.
     Each app shows an icon: a .ico file with the same name as the app file
-    (e.g. app-name.ico next to app-name.bat) if one exists, otherwise a
-    generic folder icon. Double-click to launch the app.
+    (e.g. app-name.ico next to app-name.bat) if one exists, otherwise a favicon.ico
+    in the same folder if that exists, otherwise a generic folder icon. Double-click to
+    launch the app.
   * Settings — choose the data folder where apps.json and folders.json are
     stored; both files are created automatically if they don't exist.
 """
@@ -1077,7 +1078,8 @@ class AppLauncherTab:
         return "\n".join(lines)
 
     def _icon_for(self, path):
-        """Icon for an app: its .ico twin if one exists, else the folder icon.
+        """Icon for an app: its .ico twin, else a favicon.ico in the same folder,
+        else the folder icon.
 
         PhotoImage has no alpha channel, so transparent pixels are flattened
         onto the grid's background color to stay invisible against it.
@@ -1085,10 +1087,15 @@ class AppLauncherTab:
         if path in self._images:
             return self._images[path]
         base = os.path.splitext(os.path.basename(path))[0]
-        ico_path = os.path.join(os.path.dirname(path), base + ".ico")
+        folder = os.path.dirname(path)
         img = None
-        if os.path.isfile(ico_path):
-            img = load_ico_image(ico_path, self.ICON_SIZE, background=self._bg_rgb())
+        # Prefer an .ico twin named after the app file; fall back to a shared
+        # favicon.ico in the same folder when the twin is missing.
+        for candidate in (os.path.join(folder, base + ".ico"), os.path.join(folder, "favicon.ico")):
+            if os.path.isfile(candidate):
+                img = load_ico_image(candidate, self.ICON_SIZE, background=self._bg_rgb())
+                if img is not None:
+                    break
         if img is None:
             img = folder_icon(self.ICON_SIZE)
         self._images[path] = img

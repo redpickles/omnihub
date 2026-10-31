@@ -28,7 +28,7 @@ Companion to `ai_state.md`. Details too verbose for working memory but costly to
 {"apps": [{"name": "...", "path": "..."}]}
 ```
 
-- `name` is freely renamable; `path` drives both launch and icon lookup, which looks for a **same-basename `.ico` twin** in the same directory (`foo.bat` ↔ `foo.ico`).
+- `name` is freely renamable; `path` drives both launch and icon lookup, which looks for a **same-basename `.ico` twin** in the same directory (`foo.bat` ↔ `foo.ico`), and if that's absent falls back to a **`favicon.ico`** in the same directory (`_icon_for` in `app.py`), else the generic folder icon.
 
 ## Icon Engine
 

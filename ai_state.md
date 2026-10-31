@@ -41,7 +41,7 @@ Everything lives in `app.py`, top to bottom; deep detail per part in `docs/archi
 
 ## Status & Constraints
 
-- **Current status:** feature-complete — all four tabs working; Tools tab has two panels. HEAD is `ee2b561` (docs); uncommitted: the spreadsheet tool (incl. the fourth grand-total box), the new `docs/architecture.md` spreadsheet section, `docs/testing.md`, and the v1.0.1.8 bump.
+- **Current status:** feature-complete — all four tabs working; Tools tab has two panels. HEAD is `ee2b561` (docs); uncommitted: the spreadsheet tool (incl. the fourth grand-total box), the `favicon.ico` icon fallback, the new `docs/architecture.md` spreadsheet section, `docs/testing.md`, and the v1.0.1.8 bump.
 - **Known gaps:** folder entries aren't validated at load time — a missing folder surfaces only when you try to open it.
 
 ## Decisions & Gotchas
@@ -53,6 +53,8 @@ Everything lives in `app.py`, top to bottom; deep detail per part in `docs/archi
 - **venv is a local artifact** (git-ignored): recreation recipe in `docs/architecture.md`; never copy from another project.
 
 ## Latest Session Delta
+
+- App Launcher icon lookup (`_icon_for`, `app.py`): now tries the **same-basename `.ico` twin** first, then a **`favicon.ico`** in the same directory as a secondary fallback, else the generic folder icon. README "Icons"/"Creating icons" and `docs/architecture.md` updated to match. No version bump (minor enhancement).
 
 - Added **Mini Simple Spreadsheet** to `ToolsTab` (`app.py`): `_add_mini_spreadsheet_tool` + helpers `_update_spread_sums` / `_select_spread_sum` / `_clear_spreadsheet` / `_copy_selected_sum`.
 - Version 1.0.1.7 → 1.0.1.8 in the same change (`VERSION` + README H1); README Tools section documents the tool. The later grand-total box did **not** bump it.
