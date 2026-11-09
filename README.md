@@ -1,4 +1,4 @@
-# Version 1.0.1.9
+# Version 0.7.8.8
 
 # OmniHub
 
@@ -63,6 +63,9 @@ Choose where your data is stored.
 - **Data folder** — `apps.json` and `folders.json` live here. Pick a folder with **Browse…**; the choice is remembered in `settings.json`. If either data file doesn't exist in the folder, it's created automatically (existing files are never overwritten).
 - The default data folder is the `data` subdirectory next to the app.
 - If the configured data folder no longer exists at startup, you're prompted to pick an existing one; cancelling reverts to the default (`data` subdirectory next to the app). A stale folder is never recreated silently.
+
+### About
+Shows the app name and version (e.g. **OmniHub v0.7.8.8**) and the last updated date (e.g. `updated 2026-11-09`). Both come from the `VERSION` and `LAST_UPDATED` constants at the top of `app.py` — the single source of truth; bump them there when releasing.
 
 ## Requirements
 

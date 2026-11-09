@@ -13,6 +13,7 @@ Tabs:
     launch the app.
   * Settings — choose the data folder where apps.json and folders.json are
     stored; both files are created automatically if they don't exist.
+  * About — show the app name, version (see VERSION), and last updated date.
 """
 
 import json
@@ -23,7 +24,8 @@ import zlib
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 APP_NAME = "OmniHub"
-VERSION = "1.0.1.9"
+VERSION = "0.7.8.8"  # single source of truth — bump here, nowhere else
+LAST_UPDATED = "2026-11-09"  # date of the latest feature release (YYYY-MM-DD)
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "folders.json")
 
 
@@ -1799,6 +1801,25 @@ class ToolsTab:
         top.update_idletasks()
 
 
+class AboutTab:
+    """The About tab: app name, version, and last updated date.
+
+    Both values come from the module-level constants VERSION and
+    LAST_UPDATED — the single source of truth for the app's identity.
+    """
+
+    def __init__(self, parent):
+        frame = ttk.Frame(parent)
+        frame.pack(expand=True)  # center the block in the tab
+
+        ttk.Label(
+            frame,
+            text=f"{APP_NAME} v{VERSION}",
+            font=("Segoe UI", 16, "bold"),
+        ).pack()
+        ttk.Label(frame, text=f"updated {LAST_UPDATED}", padding=(0, 8, 0, 0)).pack()
+
+
 class MainApp:
     """The main window: a notebook with one tab per app."""
 
@@ -1827,6 +1848,10 @@ class MainApp:
         settings_tab = ttk.Frame(notebook)
         notebook.add(settings_tab, text="Settings")
         SettingsTab(settings_tab, settings, self._reload_tabs)
+
+        about_tab = ttk.Frame(notebook)
+        notebook.add(about_tab, text="About")
+        AboutTab(about_tab)
 
     def _reload_tabs(self):
         """Re-read both tabs' data after the data folder changes."""
