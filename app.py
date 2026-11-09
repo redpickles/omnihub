@@ -23,7 +23,7 @@ import zlib
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 APP_NAME = "OmniHub"
-VERSION = "1.0.1.8"
+VERSION = "1.0.1.9"
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "folders.json")
 
 
@@ -1283,7 +1283,7 @@ class SettingsTab:
 
 
 class ToolsTab:
-    """The Tools tab: small, self-contained utility tools.
+    r"""The Tools tab: small, self-contained utility tools.
 
     Holds independent stacked panels, one per tool:
 
@@ -1294,9 +1294,12 @@ class ToolsTab:
       up. Clicking any total selects it (no editing possible); Ctrl+C copies
       the selected total to the clipboard; a "Clear all" button empties the
       grid.
+    * Slash Reverser — a path in, the same path with every `/` and `\`
+      swapped, live as you type, with a copy icon beside the result.
 
-    Tools are stacked as independent panels so more can be added later
-    without restructuring the tab.
+    Tools are independent panels so more can be added without restructuring
+    the tab. They stack vertically, except the spreadsheet and the Slash
+    Reverser, which share one row side by side.
     """
 
     _SPREAD_ROWS = 5  # editable rows; the sixth row holds the column sums
@@ -1307,6 +1310,13 @@ class ToolsTab:
     _SPREAD_SELECTED_BG = "#b6d7f0"  # sum cell color while selected
     _SPREAD_GRAND_BG = "#f9fcb2"  # grand-total cell color (always, never selected)
 
+    # Slash Reverser: swap `/` (60) and `\` (92) in both directions; every
+    # other character is left alone, so dots in versions and the drive colon
+    # survive untouched. Both characters must appear in *both* strings: a
+    # two-argument `maketrans` pairs them positionally, so a one-character
+    # pair would only ever map `/` → `\`.
+    _SLASH_TRANS = str.maketrans("/\\", "\\/")
+
     def __init__(self, parent):
         self.parent = parent
         self._build_ui()
@@ -1315,12 +1325,19 @@ class ToolsTab:
         frame = ttk.Frame(self.parent, padding=(8, 8))
         frame.pack(fill="both", expand=True)
 
-        # One panel per tool; add more panels below this one.
+        # One panel per tool, stacked top to bottom; add more panels below.
         self.panels = ttk.Frame(frame)
         self.panels.pack(fill="x")
 
         self._add_bytes_to_kb_tool()
+
+        # The spreadsheet and the Slash Reverser share one row: the grid
+        # hugs the left, the reverser fills the space to its right.
+        self._tool_row = ttk.Frame(self.panels)
+        self._tool_row.pack(fill="x", pady=(10, 0))
+
         self._add_mini_spreadsheet_tool()
+        self._add_slash_reverser_tool()
 
     def _add_bytes_to_kb_tool(self):
         panel = ttk.LabelFrame(self.panels, text="KB → Bytes", padding=(10, 8))
@@ -1357,33 +1374,15 @@ class ToolsTab:
         )
         self.result_label.pack(side="left", padx=(4, 0))
 
-        self._copy_btn = tk.Frame(row, width=30, height=30, takefocus=0)
-        self._copy_btn.pack(side="left", padx=(10, 0))
-        self._copy_btn.pack_propagate(False)
-        self._copy_canvas = tk.Canvas(
-            self._copy_btn,
-            width=24,
-            height=24,
-            highlightthickness=0,
-            background=self._copy_btn.cget("background"),
-            takefocus=0,
+        self._copy_canvas = self._make_copy_button(
+            row, lambda: self.result_var.get(), padx=(10, 0)
         )
-        self._copy_canvas.pack(side="left")
-        self._copy_canvas.bind("<Button-1>", self._copy_answer)
-        self._copy_canvas.bind(
-            "<Enter>", lambda e: self._copy_canvas.configure(cursor="hand2")
-        )
-        self._copy_canvas.bind(
-            "<Leave>", lambda e: self._copy_canvas.configure(cursor="")
-        )
-        self._draw_copy_icon()
-        self._bind_tooltip(self._copy_canvas, "Copy to clipboard")
 
     def _add_mini_spreadsheet_tool(self):
         panel = ttk.LabelFrame(
-            self.panels, text="Mini Simple Spreadsheet", padding=(10, 8)
+            self._tool_row, text="Mini Simple Spreadsheet", padding=(10, 8)
         )
-        panel.pack(fill="x", pady=(10, 0))
+        panel.pack(side="left", fill="y")
 
         # "Clear all" hugs the top-right corner of the panel, opposite the
         # panel's label text.
@@ -1503,7 +1502,91 @@ class ToolsTab:
         top.bind("<Control-C>", self._copy_selected_sum)
         top.bind("<Key>", self._copy_selected_sum)
 
+    def _add_slash_reverser_tool(self):
+        panel = ttk.LabelFrame(self._tool_row, text="Slash Reverser", padding=(10, 8))
+        panel.pack(side="left", fill="both", expand=True, padx=(10, 0))
+
+        ttk.Label(panel, text="Enter path:").pack(anchor="w")
+
+        self._path_var = tk.StringVar(value="")
+        self._path_var.trace_add("write", self._update_reversed_path)
+        # A `tk.Entry` defaults to 60 characters wide, which would make this
+        # panel wider than the space beside the spreadsheet and force the
+        # window to grow. `width=1` keeps the *request* small; `fill="x"`
+        # then stretches it to whatever the row actually offers.
+        self.path_entry = tk.Entry(panel, textvariable=self._path_var, width=1)
+        self.path_entry.pack(fill="x", pady=(2, 6))
+        # Clicking the box selects the whole path, so the next paste or
+        # keystroke replaces it instead of inserting into the middle.
+        self.path_entry.bind("<Button-1>", self._select_all_on_click)
+
+        ttk.Label(panel, text="Output:").pack(anchor="w")
+
+        row = ttk.Frame(panel)
+        row.pack(fill="x")
+
+        # Same story as the entry: `width=1` means a long path can never
+        # widen the window — the text is shown left-aligned and clipped by
+        # the panel, and the copy icon still yields the full value.
+        self._slash_var = tk.StringVar(value="")
+        self._slash_result = tk.Label(
+            row,
+            textvariable=self._slash_var,
+            width=1,
+            anchor="w",
+            relief="sunken",
+            borderwidth=1,
+            background="#f5f5f5",
+        )
+        self._slash_result.pack(side="left", fill="x", expand=True)
+
+        self._slash_copy_canvas = self._make_copy_button(
+            row, lambda: self._slash_var.get(), padx=(10, 0)
+        )
+
     # -------------------------------------------------------------- helpers
+
+    def _make_copy_button(self, parent, get_value, padx=(0, 0)):
+        """A 30×30 copy button: a hand-drawn 24×24 glyph on a canvas, with a
+        hand cursor, a tooltip, and click-to-copy.
+
+        `get_value()` supplies the text to copy at click time (an empty value
+        is ignored). The glyph flashes green on a successful copy. Returns
+        the canvas, which `_draw_copy_icon` repaints.
+        """
+        btn = tk.Frame(parent, width=30, height=30, takefocus=0)
+        btn.pack(side="left", padx=padx)
+        btn.pack_propagate(False)
+        canvas = tk.Canvas(
+            btn,
+            width=24,
+            height=24,
+            highlightthickness=0,
+            background=btn.cget("background"),
+            takefocus=0,
+        )
+        canvas.pack(side="left")
+        canvas.bind("<Button-1>", lambda e: self._copy_value(canvas, get_value))
+        canvas.bind("<Enter>", lambda e: canvas.configure(cursor="hand2"))
+        canvas.bind("<Leave>", lambda e: canvas.configure(cursor=""))
+        self._draw_copy_icon(canvas)
+        self._bind_tooltip(canvas, "Copy to clipboard")
+        return canvas
+
+    def _copy_value(self, canvas, get_value):
+        """Copy `get_value()` to the clipboard, then flash the glyph green."""
+        value = get_value().strip()
+        if not value:
+            return
+        top = self.parent.winfo_toplevel()
+        try:
+            top.clipboard_clear()
+            top.clipboard_append(value)
+        except tk.TclError:
+            return
+        top.update_idletasks()
+        self._draw_copy_icon(canvas, accent=True)
+        canvas.after(350, lambda: self._draw_copy_icon(canvas))
 
     @staticmethod
     def _validate_bytes(new):
@@ -1546,8 +1629,12 @@ class ToolsTab:
             return
         self.result_var.set(self._format_number(value * 1024))
 
-    def _draw_copy_icon(self, accent=False):
-        c = self._copy_canvas
+    def _draw_copy_icon(self, canvas, accent=False):
+        """Draw the copy glyph (two overlapping documents) on `canvas`.
+
+        `accent` paints it green — the brief "copied!" feedback flash.
+        """
+        c = canvas
         c.delete("all")
         if accent:
             back_fill, back_outline = "#8bc34a", "#4caf50"
@@ -1595,19 +1682,47 @@ class ToolsTab:
         widget.bind("<Enter>", lambda e: schedule_show())
         widget.bind("<Leave>", lambda e: hide())
 
-    def _copy_answer(self, event=None):
-        value = self.result_var.get().strip()
-        if not value:
+    # -------------------------------------------------------- slash reverser
+
+    def _select_all_on_click(self, event):
+        """Click handler: highlight the whole path so the next input replaces it.
+
+        The binding deliberately does *not* return `break`. Returning `break`
+        swallows Tk's own click handling, and that handling is what gives the
+        box the focus — an unfocused Entry draws no caret and no highlight at
+        all, which is exactly what an empty box looked like. So Tk processes
+        the click (focus + caret) as usual, and the select-all is deferred one
+        event-loop step to land after it.
+        """
+        event.widget.after(0, self._select_all_path)
+
+    def _select_all_path(self):
+        """Give the path box the focus, then select the whole path.
+
+        `focus_set()` first is not cosmetic: calling `selection_range()` on an
+        entry that does not own the focus makes the entry *give up* focus — it
+        jumps back to the previously focused widget, which is exactly how the
+        caret vanished. An empty box is never selected (there is nothing to
+        replace), but it still gets focus so the caret stays visible while you
+        start typing.
+        """
+        entry = self.path_entry
+        entry.focus_set()
+        if not entry.get():
             return
-        top = self.parent.winfo_toplevel()
-        try:
-            top.clipboard_clear()
-            top.clipboard_append(value)
-        except tk.TclError:
-            return
-        top.update_idletasks()
-        self._draw_copy_icon(accent=True)
-        self._copy_canvas.after(350, self._draw_copy_icon)
+        entry.selection_range(0, "end")
+
+    def _update_reversed_path(self, *args):
+        """Trace callback: flip every separator in the path, live as you type.
+
+        Backslashes become forward slashes and vice versa, character by
+        character, so a Windows path comes out in URL/forward-slash form and
+        a forward-slash path comes back as Windows-style. Mixed input flips
+        each separator individually. `str.translate` never scans for
+        substrings, so everything else (drive colon, underscores, the `v1.0.0`
+        dots) is kept exactly as typed.
+        """
+        self._slash_var.set(self._path_var.get().translate(self._SLASH_TRANS))
 
     # ------------------------------------------ mini simple spreadsheet
 
@@ -1689,7 +1804,10 @@ class MainApp:
 
     def __init__(self, root: tk.Tk, settings):
         root.title("OmniHub")
-        root.geometry("700x520")
+        # 800 wide: the Tools tab places the Mini Simple Spreadsheet and the
+        # Slash Reverser side by side, and at 700 the reverser's output box is
+        # too narrow to show a typical Windows path.
+        root.geometry("800x520")
 
         notebook = ttk.Notebook(root)
         notebook.pack(fill="both", expand=True, padx=6, pady=6)

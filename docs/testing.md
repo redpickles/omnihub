@@ -34,7 +34,38 @@ Notes:
 - Set cell values through the Python `StringVar` handles (`tab._spread_vars[i].set(...)`),
   then call `update_idletasks()` before reading derived values.
 
-## Covered by the current run (fourth total box, selectable + copyable)
+## Covered by the current run (path box click selects all)
+
+- A `<Button-1>` binding exists on `path_entry` (read back with `entry.bind("<Button-1>")`); the KB `bytes_entry` has none.
+- With focus on another widget and a path in the box, a synthesized click (`<Button-1>` + `<ButtonRelease-1>`, `-x`/`-y` inside the box) leaves `selection_present()` true, `selection_get()` equal to the whole path, and `focus_get()` on the entry. The path and the converted output are unchanged by the click.
+- Clicking **near the start** and **near the end** of the box both select everything (no caret placement).
+- Follow-up input replaces the whole path: `<KeyPress-X>` → `X`; `<<Paste>>` with `D:/…` on the clipboard → that path, and the output flipped back; `<KeyPress-BackSpace>` → empty, and the output went empty too.
+- Clicking an **empty** box raises nothing and leaves no selection; output stays empty.
+- Regression: KB `2` → `2048`; spreadsheet column sum `1.5 + 3` → `4.5`.
+- Visually confirmed by window screenshot: the click paints the blue selection on the path.
+
+### Follow-up run (caret visibility fix)
+
+- Clicking an **empty** box now focuses the entry (`focus_get() is path_entry`) and leaves no selection, with `index("insert") == 0`; window screenshot shows the caret bar in the empty box. Before the fix, `focus_get()` was **not** the entry after an empty click — an unfocused Entry draws no caret, which is what "the cursor doesn't show" was.
+- Clicking a box **with** text: focus stays on the entry, selection covers the whole path, output converts (`D:\a\b\c` → `D:/a/b/c`); the screenshot shows the selection band and **no caret** — Tk draws no caret while text is selected.
+- Isolated Tk probes (`probe_focus2.py`): click alone → focus on the entry, caret at the click index, no selection; `selection_range()` without focus → focus leaves the entry; `focus_set()` then `selection_range()` → focus stays.
+- The 24 checks in `check_select_all.py` all pass after the handler stopped returning `break`.
+
+Caveat: caret **visibility** can only be judged from a screenshot, and the caret blinks (~530 ms), so a single shot may catch the off phase — the empty-box shot caught it, a later text-without-selection shot did not and was not treated as evidence either way.
+
+Click-synthesis notes: `event_generate` on an **unmapped** widget does nothing — these checks need `deiconify()` + `update()` first (that also corrected the old `docs/architecture.md` claim that `<Button-1>` can't be synthesized; a bare `<Key>`/`<KeyPress>` **without** a keysym is still a no-op, so key presses are synthesized as `<KeyPress-X>`).
+
+## Covered in an earlier run (Slash Reverser, + spreadsheet/KB regression)
+
+- Conversion both ways: `D:\Games\MUGEN\Ikemen_GO-v0.99.0-16x9` → `D:/Games/MUGEN/Ikemen_GO-v0.99.0-16x9` and back; `\\server\share\dir` → `//server/share/dir`; mixed `C:\a/b\c` → `C:/a\b/c`; text with no separators and `""` are unchanged. A 68-char path converts exactly.
+- Widgets: output is a `tk.Label`, input a `tk.Entry`; the reverser's copy canvas is a **different** canvas from the KB tool's (`_slash_copy_canvas is not _copy_canvas`) and has a real `<Button-1>` binding.
+- Copy: `_copy_value(canvas, getter)` puts `D:/Games/MUGEN/Ikemen_GO-v0.99.0-16x9` on the clipboard; an **empty** output leaves a `SENTINEL` clipboard value untouched. The KB tool still shows `2048` for `2` and still copies through the same helper.
+- Geometry (window-relative, `WIN_W = 800`): output box x=446 vs grid right x=320 (to the right of the grid), y=178 below the KB tool, right edge 740 < 800 (inside the window), width 294px ≥ the 234px the 37-char sample needs in Segoe UI 9. Setting a 68-char path leaves `winfo_width()` at 800 — it cannot grow the window.
+- Spreadsheet regression: sums `12`/`2.25`/`7` → grand `21.25`; Clear all → four `0`s; Ctrl+C on the selected grand box copies `0`.
+
+Geometry notes for this run: positions were compared **relative to the toplevel** (`winfo_rootx()` minus the toplevel's `winfo_rootx()`) — raw `winfo_rootx()` is a *screen* coordinate and comparing it against the window width gave a false failure. `root.deiconify()` + `update()` were required before any `winfo_width()` read (a `withdraw()`n root reports 1×1 for panels too). The sample-width assertion uses `tkinter.font.Font.measure`, not a hand-picked constant.
+
+## Covered in an earlier run (fourth total box, selectable + copyable)
 
 - The grand total is the 4th total cell: `len(_spread_sum_vars) == len(_spread_sum_labels)
   == len(_spread_sum_bg) == 4`, `_spread_sum_vars[3] is _spread_grand_var`,

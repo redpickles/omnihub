@@ -1,4 +1,4 @@
-# Version 1.0.1.8
+# Version 1.0.1.9
 
 # OmniHub
 
@@ -55,6 +55,7 @@ Small, self-contained utility tools, added one at a time.
 
 - **KB → Bytes** — enter a number of kilobytes and get the byte count instantly. Type a value and the result updates live (value × 1024); click the copy icon to the right of the result to copy it to the clipboard.
 - **Mini Simple Spreadsheet** — a small 3-column × 6-row grid of equal-size cells with a slim 2px gap between rows and columns. Type numbers into the top five rows (digits, an optional leading `-` for negatives, and at most one decimal point); the sixth row shows each column's total live, in bold, followed by a **fourth total box** (pale yellow `#f9fcb2`) that adds the three column totals together and updates live as you type. Total cells can't be edited — clicking one simply **selects** it (light blue; click again to deselect, or click another total to move the selection), and pressing **Ctrl+C** copies the selected total to the clipboard, **including the grand total**. A deselected box returns to its own color: gray for the three column sums, pale yellow for the grand total. A **Clear all** button at the top-right of the spreadsheet empties every editable cell.
+- **Slash Reverser** — sits to the right of the spreadsheet. Type or paste a path (e.g. `D:\Games\MUGEN\Ikemen_GO-v0.99.0-16x9`) and the **Output** box shows the same path with every slash flipped the other way: `\` → `/` (→ `D:/Games/MUGEN/Ikemen_GO-v0.99.0-16x9`), and `/` → `\` just as easily. It works in both directions, live as you type, and only touches `/` and `\` — the drive colon, underscores and the dots in version numbers stay exactly as typed. **Clicking the path box selects the whole path**, so the next thing you type or paste replaces it instead of being inserted into the middle (an empty box just gets the caret, as usual). Click the copy icon beside the output to put the result on the clipboard.
 
 ### Settings
 Choose where your data is stored.
