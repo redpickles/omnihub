@@ -13,7 +13,9 @@ Tabs:
     in the same folder if that exists, otherwise a generic folder icon. Double-click to
     launch the app.
   * Settings — choose the data folder where apps.json and folders.json are
-    stored; both files are created automatically if they don't exist.
+    stored; both files are created automatically if they don't exist. Also
+    exports everything (data plus app icons) to one dated .zip archive, and
+    imports such an archive back.
   * About — show the app name, version (see VERSION), and last updated date.
 """
 
@@ -24,8 +26,10 @@ import tkinter as tk
 import zlib
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
+import backup
+
 APP_NAME = "OmniHub"
-VERSION = "0.7.8.9"  # single source of truth — bump here, nowhere else
+VERSION = "0.7.9.0"  # single source of truth — bump here, nowhere else
 LAST_UPDATED = "2026-11-17"  # date of the latest feature release (YYYY-MM-DD)
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "folders.json")
 
@@ -134,6 +138,11 @@ def load_settings():
 def save_settings(settings):
     """Persist app settings to settings.json."""
     _atomic_write(SETTINGS_FILE, json.dumps(settings, ensure_ascii=False, indent=2))
+
+
+def same_path(a, b):
+    """True if two strings name the same file-system path on this machine."""
+    return os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))
 
 
 def set_data_folder(folder):
@@ -372,6 +381,21 @@ def load_ico_image(ico_path, size, background=(255, 255, 255)):
         return _dib_to_photoimage(blob, size, background)
     except Exception:
         return None
+
+
+def resolve_icon_path(app_path):
+    """The .ico file shown for `app_path`, or None if it has none.
+
+    Prefers an .ico twin named after the app file, falling back to a shared
+    favicon.ico in the same folder. Used both by the grid renderer (`_icon_for`)
+    and by backups, so the two can never disagree about which file is "the icon".
+    """
+    base = os.path.splitext(os.path.basename(app_path))[0]
+    folder = os.path.dirname(app_path)
+    for candidate in (os.path.join(folder, base + ".ico"), os.path.join(folder, "favicon.ico")):
+        if os.path.isfile(candidate):
+            return candidate
+    return None
 
 
 def folder_icon(size=32):
@@ -1131,16 +1155,10 @@ class AppLauncherTab:
         """
         if path in self._images:
             return self._images[path]
-        base = os.path.splitext(os.path.basename(path))[0]
-        folder = os.path.dirname(path)
         img = None
-        # Prefer an .ico twin named after the app file; fall back to a shared
-        # favicon.ico in the same folder when the twin is missing.
-        for candidate in (os.path.join(folder, base + ".ico"), os.path.join(folder, "favicon.ico")):
-            if os.path.isfile(candidate):
-                img = load_ico_image(candidate, self.ICON_SIZE, background=self._bg_rgb())
-                if img is not None:
-                    break
+        icon_path = resolve_icon_path(path)
+        if icon_path is not None:
+            img = load_ico_image(icon_path, self.ICON_SIZE, background=self._bg_rgb())
         if img is None:
             img = folder_icon(self.ICON_SIZE)
         self._images[path] = img
@@ -1283,10 +1301,12 @@ class AppLauncherTab:
 
 
 class SettingsTab:
-    """The Settings tab: choose where the data files are stored.
+    """The Settings tab: choose where the data files are stored, and back them up.
 
     apps.json and folders.json live in the data folder; both are created
-    automatically if they don't exist there.
+    automatically if they don't exist there. **Export data…** packs those files
+    plus every icon the App Launcher uses into one dated .zip; **Import data…**
+    restores such an archive. The archive format itself lives in `backup.py`.
     """
 
     def __init__(self, parent, settings, on_change):
@@ -1301,16 +1321,34 @@ class SettingsTab:
 
         ttk.Label(frame, text="Data folder", padding=(0, 0, 0, 4)).pack(anchor="w")
 
-        row = ttk.Frame(frame)
-        row.pack(fill="x")
-        self.path_label = ttk.Label(row, text=self.settings["data_folder"], anchor="w")
+        folder_row = ttk.Frame(frame)
+        folder_row.pack(fill="x")
+        self.path_label = ttk.Label(folder_row, text=self.settings["data_folder"], anchor="w")
         self.path_label.pack(side="left", fill="x", expand=True)
-        ttk.Button(row, text="Browse…", command=self.browse).pack(side="right")
+        ttk.Button(folder_row, text="Browse…", command=self.browse).pack(side="right")
 
         ttk.Label(
             frame,
             text="apps.json and folders.json are stored in this folder. "
                  "They're created automatically if they don't exist.",
+            padding=(0, 8, 0, 0),
+            justify="left",
+        ).pack(anchor="w")
+
+        ttk.Label(frame, text="Backup", padding=(0, 16, 0, 4)).pack(anchor="w")
+
+        backup_row = ttk.Frame(frame)
+        backup_row.pack(fill="x")
+        ttk.Button(backup_row, text="Export data…", command=self.export_data).pack(side="left")
+        ttk.Button(backup_row, text="Import data…", command=self.import_data).pack(
+            side="left", padx=(8, 0)
+        )
+
+        ttk.Label(
+            frame,
+            text="Export collects your folders, app shortcuts and their icons into one "
+                 "dated .zip file.\nImport replaces the current data with what's inside "
+                 "an archive made by Export.",
             padding=(0, 8, 0, 0),
             justify="left",
         ).pack(anchor="w")
@@ -1325,6 +1363,108 @@ class SettingsTab:
         set_data_folder(folder)  # creates apps.json / folders.json if missing
         self.path_label.configure(text=folder)
         self.on_change()
+
+    # ---------------------------------------------------------------- backup
+
+    def _zip_filetypes(self):
+        return [("Zip archive", "*" + backup.COMPRESSED), ("All files", "*.*")]
+
+    def export_data(self):
+        """Save-as a backup of the data files and every icon they use."""
+        folder = self.settings["data_folder"]
+        dest = filedialog.asksaveasfilename(
+            title="Export data",
+            parent=self.parent,
+            defaultextension=backup.COMPRESSED,
+            initialfile=backup.default_export_name(APP_NAME.lower() + "-backup"),
+            filetypes=[("Zip archive", "*" + backup.COMPRESSED)],
+            # Start where the data lives, so backups collect in one place.
+            # Omitted when that folder is gone (a network or removable drive can
+            # vanish mid-session); Tk drops a None option rather than showing a
+            # dialog pointed at nothing.
+            initialdir=folder if os.path.isdir(folder) else None,
+        )
+        if not dest:
+            return
+        if not dest.lower().endswith(backup.COMPRESSED):
+            # The save dialog appends the extension only when the name has none,
+            # so an explicit wrong one would otherwise produce a .zip called .7z.
+            messagebox.showwarning(
+                APP_NAME, f"Backups are zip archives, so the name must end in "
+                          f"{backup.COMPRESSED}:\n{dest}"
+            )
+            return
+        try:
+            report = backup.export_zip(
+                dest,
+                data_folder=folder,
+                settings_file=SETTINGS_FILE,
+                apps=load_apps(),
+                icon_resolver=resolve_icon_path,
+                app_name=APP_NAME,
+                version=VERSION,
+            )
+        except (OSError, backup.BackupError) as exc:
+            messagebox.showerror(APP_NAME, f"Export failed:\n{exc}")
+            return
+
+        text = (
+            f"Backup saved to:\n{dest}\n\n"
+            f"{len(report['data'])} data file(s) and {len(report['icons'])} icon(s)."
+        )
+        if report["notes"]:
+            text += "\n\nNot included:\n" + "\n".join("- " + n for n in report["notes"])
+        messagebox.showinfo(APP_NAME, text)
+
+    def import_data(self):
+        """Restore a backup archive over the current data folder."""
+        folder = self.settings["data_folder"]
+        src = filedialog.askopenfilename(
+            title="Import data",
+            parent=self.parent,
+            filetypes=self._zip_filetypes(),
+            # Same folder as Export: backups tend to sit next to the data.
+            initialdir=folder if os.path.isdir(folder) else None,
+        )
+        if not src:
+            return
+        try:
+            manifest = backup.read_manifest(src, app_name=APP_NAME)
+        except backup.BackupError as exc:
+            messagebox.showerror(APP_NAME, str(exc))
+            return
+
+        question = (
+            f"Replace everything in:\n{folder}\n\n"
+            f"with the backup made {manifest['exported']}?"
+        )
+        made_in = manifest.get("data_folder")
+        if made_in and not same_path(made_in, folder):
+            question += f"\n\n(it was made in:\n{made_in})"
+        question += (
+            "\n\nData files are overwritten, and icons are put back next to "
+            "their app files."
+        )
+        if not messagebox.askyesno(APP_NAME, question):
+            return
+        try:
+            report = backup.import_zip(src, folder, app_name=APP_NAME)
+        except backup.BackupError as exc:
+            messagebox.showerror(APP_NAME, str(exc))
+            return
+
+        # The tabs read from disk, so make them re-load what we just wrote
+        # (this also clears the App Launcher's icon cache).
+        self.on_change()
+
+        text = (
+            f"Restored {len(report['data'])} data file(s) and {len(report['icons'])} icon(s)."
+        )
+        if report["identical"]:
+            text += f" {report['identical']} icon(s) were already up to date."
+        if report["notes"]:
+            text += "\n\nSkipped:\n" + "\n".join("- " + n for n in report["notes"])
+        messagebox.showinfo(APP_NAME, text)
 
 
 class ToolsTab:

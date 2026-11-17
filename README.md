@@ -1,4 +1,4 @@
-# Version 0.7.8.9
+# Version 0.7.9.0
 
 # OmniHub
 
@@ -58,18 +58,21 @@ Small, self-contained utility tools, added one at a time.
 - **Slash Reverser** — sits to the right of the spreadsheet. Type or paste a path (e.g. `D:\Games\MUGEN\Ikemen_GO-v0.99.0-16x9`) and the **Output** box shows the same path with every slash flipped the other way: `\` → `/` (→ `D:/Games/MUGEN/Ikemen_GO-v0.99.0-16x9`), and `/` → `\` just as easily. It works in both directions, live as you type, and only touches `/` and `\` — the drive colon, underscores and the dots in version numbers stay exactly as typed. **Clicking the path box selects the whole path**, so the next thing you type or paste replaces it instead of being inserted into the middle (an empty box just gets the caret, as usual). Click the copy icon beside the output to put the result on the clipboard.
 
 ### Settings
-Choose where your data is stored.
+Choose where your data is stored, and back it up.
 
 - **Data folder** — `apps.json` and `folders.json` live here. Pick a folder with **Browse…**; the choice is remembered in `settings.json`. If either data file doesn't exist in the folder, it's created automatically (existing files are never overwritten).
 - The default data folder is the `data` subdirectory next to the app.
 - If the configured data folder no longer exists at startup, you're prompted to pick an existing one; cancelling reverts to the default (`data` subdirectory next to the app). A stale folder is never recreated silently.
+- **Export data…** — a *Save As* dialog, opening **in the data folder**, for one dated **.zip** archive (default name `omnihub-backup-2026-11-17.zip`) holding `folders.json`, `apps.json` and **every icon the App Launcher uses** — icons live next to the app files rather than in the data folder, so they're collected explicitly and their original location recorded. `settings.json` is included for reference only. A dialog afterwards tells you exactly what went in, and lists anything that couldn't be.
+- **Import data…** — restores such an archive, with its *Open* dialog starting in the data folder too since that's where backups collect: a confirmation names the folder being replaced and when the backup was made, then the data files are written and each icon is put back next to its app file. Icons that are already identical are left untouched, icons whose app folder has disappeared are skipped and reported, and nothing is ever created outside a folder that already exists. Importing also refreshes the other tabs.
+- Zip was chosen over 7z (no Python support without extra software) and `.gz` (a single stream, so multiple files would mean tar.gz): the standard library writes it and Windows Explorer opens it by itself.
 
 ### About
-Shows the app name and version (e.g. **OmniHub v0.7.8.9**) and the last updated date (e.g. `updated 2026-11-17`). Both come from the `VERSION` and `LAST_UPDATED` constants at the top of `app.py` — the single source of truth; bump them there when releasing.
+Shows the app name and version (e.g. **OmniHub v0.7.9.0**) and the last updated date (e.g. `updated 2026-11-17`). Both come from the `VERSION` and `LAST_UPDATED` constants at the top of `app.py` — the single source of truth; bump them there when releasing.
 
 ## Requirements
 
-- Python 3.x (uses only the standard library — `tkinter`, `json`, `os`, `struct`, `zlib`)
+- Python 3.x (uses only the standard library — `tkinter`, `json`, `os`, `struct`, `zlib`, `zipfile`)
 - Windows (`os.startfile` opens folders with Explorer)
 - A virtual environment is provided in `venv/`; no system-wide packages are installed.
 

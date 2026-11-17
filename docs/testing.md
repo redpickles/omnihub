@@ -6,7 +6,7 @@ current checks cover. Stdlib only; run from the project root.
 ## Environment
 
 - Verified: Python 3.13.15, Tcl/Tk 8.6.15, Windows.
-- Syntax check first: `python -m py_compile app.py`.
+- Syntax check first: `python -m py_compile app.py backup.py`.
 
 ## Build a tab in isolation
 
@@ -34,7 +34,40 @@ Notes:
 - Set cell values through the Python `StringVar` handles (`tab._spread_vars[i].set(...)`),
   then call `update_idletasks()` before reading derived values.
 
-## Covered by the current run (Folder Launcher: Copy to clipboard)
+## Smoke-testing the whole app
+
+```python
+folder = os.path.join(tempfile.mkdtemp(), "data")
+os.makedirs(folder)                              # set_data_folder never creates it
+appmod.set_data_folder(folder)                   # repoints CONFIG_FILE / APPS_FILE only
+root = tk.Tk(); root.withdraw()
+main = appmod.MainApp(root, {"data_folder": folder})
+```
+
+Notes:
+
+- Never call `main()` from a check: it resolves the data folder, may prompt, and writes the real `settings.json`. `set_data_folder()` repoints the module globals **in-process only** — nothing on disk outside the temp folder is touched.
+- `MainApp` doesn't keep a reference to its `SettingsTab`, so reach buttons by walking `root`'s widget tree, and build a standalone `appmod.SettingsTab(...)` when you need to invoke handlers.
+- Snapshot the real `settings.json` and a listing of the live data folder before and after, and assert both are unchanged — the one-line guard that proves a test run was harmless.
+
+## Covered by the current run (backup: Export / Import)
+
+60 checks over `backup.py` plus the Settings tab wiring, all passing and stable across repeated runs. Fixtures: a temp tree with a data folder, fake app folders (one `.ico` twin, two apps sharing one `favicon.ico`, one app with no icon) and a fake `settings.json`.
+
+- `resolve_icon_path`: twin wins over `favicon.ico`, `favicon.ico` used when there's no twin, `None` when there's no icon at all.
+- `default_export_name` embeds today's date + `.zip`, and follows a fixed date when given one; the prefix comes from the caller so nothing hard-codes the app name.
+- `collect_icons`: a shared `favicon.ico` is stored once, arcnames are unique, each entry keeps the app it came from.
+- Export: the archive holds `manifest.json` + both data files + `settings.json` + exactly the icons collected; the manifest records app name, `app_version`, export date, source data folder and every icon's real path; archived JSON matches the source byte-for-byte; `settings.json` is listed under `reference`.
+- Round-trip: after deleting an icon and corrupting `folders.json`, import writes both data files back, restores the missing icon with the exported bytes, counts the untouched one as `identical`, leaves no `.tmp` behind, and recreates everything in a second empty data folder.
+- Gone app folder: reported in `notes`, and the folder is **not** created.
+- Rejections: zip without a manifest, a plain text file, a manifest naming a different app, and a `format` newer than `FORMAT_VERSION`.
+- Hostile manifests: data names with path tricks are skipped and nothing lands outside the data folder; entries listed but absent from the archive are reported per item instead of fatal; non-list / non-dict / non-string sections produce notes rather than an exception.
+- Settings tab (dialogs monkeypatched): both buttons exist; Export opens *Save As* with the dated, app-named default **and the data folder as `initialdir`**, and reports what it wrote; Import's *Open* dialog gets the same `initialdir`; a name not ending in `.zip` is refused with a warning and writes nothing; Import asks before replacing, the question names the target folder and the export time, then reloads the data tabs and reports the counts; cancelling the prompt asks once, reloads nothing and reports nothing; a foreign archive produces an error dialog and no reload.
+- Vanished data folder: with a folder that doesn't exist, both dialogs pass `initialdir=None` — and `tk.Tk()._options({"initialdir": None})` is asserted to drop the option, which is what makes that safe.
+- Regression: `_icon_for` still returns a `PhotoImage` for an icon'd app and still falls back to the folder icon.
+- Whole-app smoke run (the recipe above): `MainApp` builds with **Browse… / Export data… / Import data…** present, a cancelled dialog is a clean no-op, and the real `settings.json` plus the live data folder are provably unchanged.
+
+## Covered in an earlier run (Folder Launcher: Copy to clipboard)
 
 Built `FolderLauncherApp` against a throwaway data folder (`tempfile.mkdtemp()` + `set_data_folder()` + a hand-written `folders.json`, so the app's own data is never touched); 23 checks, all passing.
 
