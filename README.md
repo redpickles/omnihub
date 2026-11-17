@@ -1,4 +1,4 @@
-# Version 0.7.8.8
+# Version 0.7.8.9
 
 # OmniHub
 
@@ -17,7 +17,7 @@ Keep track of your frequently used folders — organized by category — and ope
   - **Delete** — delete a category; if it has folders, choose where they go (another category, *Uncategorized*, or delete them)
 - **Double-click** any folder to open it in Windows Explorer.
 - **Right-click** for quick actions, depending on what you click:
-  - Folder entries: Open in Explorer / Change category… / Remove entry
+  - Folder entries: Open in Explorer / **Copy to clipboard** (copies that folder's path, confirmed in the status bar) / Change category… / Remove entry
   - Categories: Rename category… / Delete category
 - Your list is persisted automatically in `folders.json` (in the data folder — see Settings), so it survives restarts.
 - Old flat-format `folders.json` files are migrated automatically into an *Uncategorized* category.
@@ -65,7 +65,7 @@ Choose where your data is stored.
 - If the configured data folder no longer exists at startup, you're prompted to pick an existing one; cancelling reverts to the default (`data` subdirectory next to the app). A stale folder is never recreated silently.
 
 ### About
-Shows the app name and version (e.g. **OmniHub v0.7.8.8**) and the last updated date (e.g. `updated 2026-11-09`). Both come from the `VERSION` and `LAST_UPDATED` constants at the top of `app.py` — the single source of truth; bump them there when releasing.
+Shows the app name and version (e.g. **OmniHub v0.7.8.9**) and the last updated date (e.g. `updated 2026-11-17`). Both come from the `VERSION` and `LAST_UPDATED` constants at the top of `app.py` — the single source of truth; bump them there when releasing.
 
 ## Requirements
 

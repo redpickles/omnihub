@@ -3,7 +3,8 @@
 Tabs:
   * Folder Launcher — keep track of frequently used folders, organized by category.
     Double-click a folder to open it with Windows Explorer; right-click for extra
-    actions (change category, remove entry, rename/delete categories).
+    actions (copy the folder's path to the clipboard, change category, remove entry,
+    rename/delete categories).
     Categories are always listed in alphabetical order.
     The list is persisted to folders.json next to this script.
   * App Launcher — shortcuts to frequently used app files, with icons.
@@ -24,8 +25,8 @@ import zlib
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 APP_NAME = "OmniHub"
-VERSION = "0.7.8.8"  # single source of truth — bump here, nowhere else
-LAST_UPDATED = "2026-11-09"  # date of the latest feature release (YYYY-MM-DD)
+VERSION = "0.7.8.9"  # single source of truth — bump here, nowhere else
+LAST_UPDATED = "2026-11-17"  # date of the latest feature release (YYYY-MM-DD)
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "folders.json")
 
 
@@ -663,6 +664,7 @@ class FolderLauncherApp:
     def __init__(self, parent):
         self.parent = parent
         self.store = load_store()
+        self._status_job = None  # pending after() that restores the status line
         self._build_ui()
         self._refresh_tree()
 
@@ -717,11 +719,33 @@ class FolderLauncherApp:
                 self.tree.insert(
                     cat_id, "end", text=entry["name"], values=(entry["path"],), tags=("entry",)
                 )
+        if self._status_job is not None:
+            self.parent.after_cancel(self._status_job)
+            self._status_job = None
+        self.status.configure(text=self._status_text())
+
+    def _status_text(self):
+        """The default status-line text: entry/category counts plus a hint."""
         total = sum(len(c["entries"]) for c in self.store["categories"])
-        self.status.configure(
-            text=f"{total} folder(s) in {len(self.store['categories'])} category(ies) · "
-                 "double-click a folder to open it"
+        return (
+            f"{total} folder(s) in {len(self.store['categories'])} category(ies) · "
+            "double-click a folder to open it"
         )
+
+    def _flash_status(self, text):
+        """Show `text` in the status line briefly, then restore the default text.
+
+        Used by actions with no other visual feedback (e.g. copying a path), so a
+        copy confirms itself without needing a dialog.
+        """
+        if self._status_job is not None:
+            self.parent.after_cancel(self._status_job)
+        self.status.configure(text=text)
+        self._status_job = self.parent.after(2500, self._reset_status)
+
+    def _reset_status(self):
+        self._status_job = None
+        self.status.configure(text=self._status_text())
 
     def reload(self):
         """Re-read the store from disk (used when the data folder changes)."""
@@ -846,6 +870,24 @@ class FolderLauncherApp:
         # Opens with the default handler — Windows Explorer on Windows.
         os.startfile(path)
 
+    def copy_path(self, event=None):
+        """Copy the selected folder's path to the clipboard."""
+        item_id = self._selected_item()
+        if item_id is None:
+            return
+        cat_index, entry_index = self._locate(item_id)
+        if entry_index is None:
+            return  # categories have no path of their own
+        path = self.store["categories"][cat_index]["entries"][entry_index]["path"]
+        top = self.parent.winfo_toplevel()
+        try:
+            top.clipboard_clear()
+            top.clipboard_append(path)
+        except tk.TclError:
+            self._flash_status("Copy failed: clipboard unavailable")
+            return
+        self._flash_status(f"Copied to clipboard: {path}")
+
     def rename_category(self, event=None):
         item_id = self._selected_item()
         if item_id is None:
@@ -913,6 +955,7 @@ class FolderLauncherApp:
         self.menu.delete(0, "end")
         if entry_index is not None:  # a folder entry
             self.menu.add_command(label="Open in Explorer", command=self.open_selected)
+            self.menu.add_command(label="Copy to clipboard", command=self.copy_path)
             self.menu.add_command(label="Change category…", command=self.change_category)
             self.menu.add_command(label="Remove entry", command=self.remove_selected)
         else:  # a category

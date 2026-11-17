@@ -1,3 +1,5 @@
+version 1.0.6
+
 # Coding & Documentation Guidelines
 
 ## 1. Project Memory (`ai_state.md`)
@@ -27,7 +29,7 @@ Maintain `ai_state.md` in the project root as compact working memory for a futur
 ## 4. Version Control & Commit Messages
 - **Never create commits automatically.** Leave all committing to the user unless explicitly instructed otherwise. Do not commit, stage, amend, or alter the Git index.
 - After each successful, meaningful code update, provide a suggested commit message as plain text that the user can copy and use. Do not provide Git commands.
-- Use concise, descriptive commit messages in the imperative mood (e.g., `Fix image loading on startup`) unless the project has an established convention.
+- Write clear, human-sounding commit messages. Use a concise imperative subject line (e.g., Fix image loading on startup), followed by 1-2 sentences of plain-English context explaining what changed and why. Keep it brief, but clear enough to understand without reading the code.
 - Base the message on changes actually made, not intended changes. Do not suggest a commit message for unsuccessful or unapplied changes.
 - If multiple independent changes were made, suggest separate commit messages when that improves clarity.
 
@@ -42,5 +44,8 @@ Maintain `ai_state.md` in the project root as compact working memory for a futur
 
 ## 6. Versioning
 - Define the version number in exactly one place (e.g., `package.json`, `pyproject.toml`, a `VERSION` file, or a single constant). Reference it from everywhere else—never duplicate it across files, docs, or UI strings. Duplicated versions drift and become wrong.
-- Bump the version only for significant feature additions or breaking changes. Do not bump for minor bug fixes, refactors, documentation changes, or routine maintenance.
+- Bump the version only for significant feature additions or breaking changes. Do not bump for minor bug fixes, refactors, documentation changes, or minor routine maintenance.
 - When bumping, update the single source of truth and any derived references (badges, changelogs) in the same change.
+- If no single source of truth verson number is currently declared in the app, start the version with 0.1.0.0
+- Bump version for regular or minor updates, minor new features --> eg. 0.1.0.1,
+- Bump version for major updates, major new features --> eg. 0.1.1.0

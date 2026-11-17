@@ -1,4 +1,4 @@
-# Headless Verification (Tools tab)
+# Headless Verification
 
 Recipe for checking Tk widgets without opening a visible window, plus what the
 current checks cover. Stdlib only; run from the project root.
@@ -13,7 +13,7 @@ current checks cover. Stdlib only; run from the project root.
 ```python
 import sys, tkinter as tk
 from tkinter import ttk
-sys.path.insert(0, r"D:\_Apps\omnihub")
+sys.path.insert(0, r"D:\Han\Apps\Utils\omnihub")
 import app as appmod
 
 root = tk.Tk()
@@ -34,7 +34,19 @@ Notes:
 - Set cell values through the Python `StringVar` handles (`tab._spread_vars[i].set(...)`),
   then call `update_idletasks()` before reading derived values.
 
-## Covered by the current run (path box click selects all)
+## Covered by the current run (Folder Launcher: Copy to clipboard)
+
+Built `FolderLauncherApp` against a throwaway data folder (`tempfile.mkdtemp()` + `set_data_folder()` + a hand-written `folders.json`, so the app's own data is never touched); 23 checks, all passing.
+
+- Menu contents read back from Tk: an entry row yields exactly **Open in Explorer / Copy to clipboard / Change category… / Remove entry**, a category row yields **Rename category… / Delete category** (no copy item — a category has no path). The copy item's `command` resolves to `copy_path`.
+- `copy_path()` on an entry row puts the entry's `path` on the clipboard (`clipboard_get()` matches `tree.item(row, "values")[0]`) and shows `Copied to clipboard: <path>` in the status line; calling `_reset_status()` restores the counts text, and `_status_text()` still starts with `2 folder(s) in 2 category(ies)`.
+- Guards: with a **category** row selected, or **no** selection, a `SENTINEL` clipboard value survives untouched.
+- Failure path: with `tk.Misc.clipboard_clear` monkeypatched to raise `tk.TclError`, `copy_path()` neither raises nor leaves the clipboard half-written, and the status line reads `Copy failed: clipboard unavailable`.
+- Timer hygiene: a flash schedules `_status_job`; `_refresh_tree()` cancels it and rewrites the default status text.
+- Regression: all other Folder Launcher methods still exist and the store file still has 2 categories.
+- Menu introspection gotcha found here: Tk's `index end` on a menu is the **last index**, not the count (4 entries → `3`) — see `docs/architecture.md`.
+
+## Covered in an earlier run (path box click selects all)
 
 - A `<Button-1>` binding exists on `path_entry` (read back with `entry.bind("<Button-1>")`); the KB `bytes_entry` has none.
 - With focus on another widget and a path in the box, a synthesized click (`<Button-1>` + `<ButtonRelease-1>`, `-x`/`-y` inside the box) leaves `selection_present()` true, `selection_get()` equal to the whole path, and `focus_get()` on the entry. The path and the converted output are unchanged by the click.

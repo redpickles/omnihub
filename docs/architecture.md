@@ -51,6 +51,8 @@ Tk's `PhotoImage` cannot display `.ico`, so the ICO container is parsed by hand:
 - Built on `ttk.Treeview`: categories (bold, `open=True`) with folder entries as children.
 - `_locate(item_id)` maps a Treeview item ID → `(category_index, entry_index)`; every action routes through it, so nothing else may assume positional indices.
 - `CategoryManagerDialog` is destroyed by `reload()` because it holds a reference to the store it was built from; otherwise it would mutate a stale copy.
+- The right-click menu is one `tk.Menu`, emptied and refilled per row in `_populate_menu` (`_locate(row)` decides entry vs. category). Entry actions: Open in Explorer / **Copy to clipboard** (`copy_path`) / Change category… / Remove entry; category actions: Rename category… / Delete category.
+- `copy_path` uses the same clipboard idiom as the Tools tab (`toplevel.clipboard_clear()` + `clipboard_append()` inside `try/except tk.TclError`) and reports through the status line instead of a dialog: `_flash_status(text)` shows the message for 2.5 s, `_reset_status` puts `_status_text()` back. `_refresh_tree()` cancels any pending flash (`self._status_job`) so a rebuild can't be overwritten by a stale timer.
 
 ## Mini Simple Spreadsheet Internals (Tools tab)
 
@@ -78,6 +80,7 @@ Tk's `PhotoImage` cannot display `.ico`, so the ICO container is parsed by hand:
 - Treeview items insert **closed** by default — pass `open=True` or children stay hidden.
 - `tree.parent()` returns `''`, not `None`, for root items.
 - `tree.selection()` returns **string item IDs**, not indices — use `tree.index(id)`.
+- `Menu.index("end")` returns the **last entry index**, not the entry count (measured: 4 entries → `3`), so introspect labels with `range(menu.index("end") + 1)`.
 - `root.iconbitmap()` may raise `TclError` on an unsupported `.ico`; it is wrapped in `try/except` in `main()`.
 - Headless testing: a `withdraw()`n root reports winfo size 1×1 — call `deiconify()` + `update()` before geometry asserts (`pack_propagate(False)` cells then measure their real pixel size).
 - Keyboard shortcuts on Windows: a plain Ctrl+letter sends the lowercase-derived virtual event (`<Control-c>`; uppercase `<Control-C>` only with Shift) — bind both. Non-Latin keyboard layouts (e.g. Cyrillic) match **neither** name (bpo-46052), but the `<Key>` event always fires and `event.char` is the control character (code 3 for Ctrl+C) — a `<Key>` binding guarded on `event.char == "\x03"` is layout-proof.
