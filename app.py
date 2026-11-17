@@ -24,7 +24,7 @@ import os
 import struct
 import tkinter as tk
 import zlib
-from tkinter import filedialog, messagebox, simpledialog, ttk
+from tkinter import filedialog, font as tkfont, messagebox, simpledialog, ttk
 
 import backup
 
@@ -1316,10 +1316,20 @@ class SettingsTab:
         self._build_ui()
 
     def _build_ui(self):
+        # Bold section headings, derived from the theme's default font so they keep
+        # the same family and size as the text around them. Kept on self: a Font
+        # object deletes its named font once it is garbage-collected. It also has
+        # to be configured separately — with `font` given, tkfont ignores every
+        # other option, so Font(font=..., weight="bold") quietly stays normal.
+        self._heading_font = tkfont.Font(font="TkDefaultFont")
+        self._heading_font.configure(weight="bold")
+
         frame = ttk.Frame(self.parent, padding=(8, 8))
         frame.pack(fill="both", expand=True)
 
-        ttk.Label(frame, text="Data folder", padding=(0, 0, 0, 4)).pack(anchor="w")
+        ttk.Label(
+            frame, text="Data folder", font=self._heading_font, padding=(0, 0, 0, 4)
+        ).pack(anchor="w")
 
         folder_row = ttk.Frame(frame)
         folder_row.pack(fill="x")
@@ -1335,7 +1345,9 @@ class SettingsTab:
             justify="left",
         ).pack(anchor="w")
 
-        ttk.Label(frame, text="Backup", padding=(0, 16, 0, 4)).pack(anchor="w")
+        ttk.Label(
+            frame, text="Backup", font=self._heading_font, padding=(0, 16, 0, 4)
+        ).pack(anchor="w")
 
         backup_row = ttk.Frame(frame)
         backup_row.pack(fill="x")

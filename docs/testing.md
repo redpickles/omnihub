@@ -52,7 +52,7 @@ Notes:
 
 ## Covered by the current run (backup: Export / Import)
 
-60 checks over `backup.py` plus the Settings tab wiring, all passing and stable across repeated runs. Fixtures: a temp tree with a data folder, fake app folders (one `.ico` twin, two apps sharing one `favicon.ico`, one app with no icon) and a fake `settings.json`.
+63 checks over `backup.py` plus the Settings tab wiring, all passing and stable across repeated runs. Fixtures: a temp tree with a data folder, fake app folders (one `.ico` twin, two apps sharing one `favicon.ico`, one app with no icon) and a fake `settings.json`.
 
 - `resolve_icon_path`: twin wins over `favicon.ico`, `favicon.ico` used when there's no twin, `None` when there's no icon at all.
 - `default_export_name` embeds today's date + `.zip`, and follows a fixed date when given one; the prefix comes from the caller so nothing hard-codes the app name.
@@ -64,6 +64,7 @@ Notes:
 - Hostile manifests: data names with path tricks are skipped and nothing lands outside the data folder; entries listed but absent from the archive are reported per item instead of fatal; non-list / non-dict / non-string sections produce notes rather than an exception.
 - Settings tab (dialogs monkeypatched): both buttons exist; Export opens *Save As* with the dated, app-named default **and the data folder as `initialdir`**, and reports what it wrote; Import's *Open* dialog gets the same `initialdir`; a name not ending in `.zip` is refused with a warning and writes nothing; Import asks before replacing, the question names the target folder and the export time, then reloads the data tabs and reports the counts; cancelling the prompt asks once, reloads nothing and reports nothing; a foreign archive produces an error dialog and no reload.
 - Vanished data folder: with a folder that doesn't exist, both dialogs pass `initialdir=None` — and `tk.Tk()._options({"initialdir": None})` is asserted to drop the option, which is what makes that safe.
+- Heading styling: walking the tab's labels shows **Data folder** and **Backup** resolve to `weight=bold` while every other label on the tab is `normal`, and the bold font still reports the default font's family and size (`TkDefaultFont` + `configure(weight="bold")`, since `Font(font=..., weight=...)` drops the weight and `ttk` rejects a `"TkDefaultFont bold"` string).
 - Regression: `_icon_for` still returns a `PhotoImage` for an icon'd app and still falls back to the folder icon.
 - Whole-app smoke run (the recipe above): `MainApp` builds with **Browse… / Export data… / Import data…** present, a cancelled dialog is a clean no-op, and the real `settings.json` plus the live data folder are provably unchanged.
 
